@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Reorder } from 'framer-motion'
 import { GripVertical, Loader2, MapPin, Navigation, Package, PackageCheck } from 'lucide-react'
 import { StatusBadge } from '../../components/ui/Badge'
-import { api } from '../../lib/api'
+import { api, ApiError } from '../../lib/api'
 import type { Order, OrderStatus } from '../../lib/types'
 
 function currency(v: number) {
@@ -35,6 +35,7 @@ export default function MotoboyFila() {
   const [busyId, setBusyId] = useState<string | null>(null)
   const [requesting, setRequesting] = useState(false)
   const [confirmingOrder, setConfirmingOrder] = useState<Order | null>(null)
+  const [error, setError] = useState<string | null>(null)
 
   const load = () => {
     setLoading(true)
@@ -69,10 +70,13 @@ export default function MotoboyFila() {
       setConfirmingOrder(order)
       return
     }
+    setError(null)
     setBusyId(order.id)
     try {
       await api.motoboy.orders.updateStatus(order.id, next)
       load()
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : 'Não foi possível atualizar o pedido.')
     } finally {
       setBusyId(null)
     }
@@ -82,11 +86,14 @@ export default function MotoboyFila() {
     if (!confirmingOrder) return
     const next = NEXT_STATUS[confirmingOrder.status]
     if (!next) return
+    setError(null)
     setBusyId(confirmingOrder.id)
     try {
       await api.motoboy.orders.updateStatus(confirmingOrder.id, next, true)
       setConfirmingOrder(null)
       load()
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : 'Não foi possível confirmar o pagamento.')
     } finally {
       setBusyId(null)
     }
@@ -110,6 +117,8 @@ export default function MotoboyFila() {
         ))}
       </div>
 
+      {error && <p className="error-msg mb-4">{error}</p>}
+
       {tab === 'pedido_pronto' && selected.length > 0 && (
         <button onClick={requestLocation} disabled={requesting} className="btn-primary w-full mb-4 text-sm py-3">
           {requesting ? <Loader2 className="w-4 h-4 animate-spin" /> : <MapPin className="w-4 h-4" />}
@@ -130,8 +139,14 @@ export default function MotoboyFila() {
         <Reorder.Group axis="y" values={orders} onReorder={setOrders} className="space-y-3">
           {orders.map((order) => {
             const next = NEXT_STATUS[order.status]
+            // Gate the popup on whichever transition is actually pending payment
+            // confirmation: normally em_rota_de_entrega -> entregue, but also
+            // entregue -> concluido as a fallback for orders that somehow got
+            // to "entregue" without it (e.g. legacy data).
             const requiresPaymentConfirm =
-              order.status === 'em_rota_de_entrega' && order.payment_method !== 'pix' && order.payment_status !== 'pago'
+              (order.status === 'em_rota_de_entrega' || order.status === 'entregue') &&
+              order.payment_method !== 'pix' &&
+              order.payment_status !== 'pago'
             return (
               <Reorder.Item
                 key={order.id}

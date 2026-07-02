@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Loader2, Package } from 'lucide-react'
 import { StatusBadge } from '../../components/ui/Badge'
 import Card from '../../components/ui/Card'
-import { api } from '../../lib/api'
+import { api, ApiError } from '../../lib/api'
 import type { Order } from '../../lib/types'
 
 function currency(v: number) {
@@ -48,6 +48,7 @@ export default function AdminPedidos() {
   const [loading, setLoading] = useState(true)
   const [confirmingOrder, setConfirmingOrder] = useState<Order | null>(null)
   const [busyId, setBusyId] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
 
   const load = () => {
     setLoading(true)
@@ -63,10 +64,13 @@ export default function AdminPedidos() {
     }
     const next = nextStatusFor(order)
     if (!next) return
+    setError(null)
     setBusyId(order.id)
     try {
       await api.admin.orders.updateStatus(order.id, next)
       load()
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : 'Não foi possível atualizar o pedido.')
     } finally {
       setBusyId(null)
     }
@@ -76,11 +80,14 @@ export default function AdminPedidos() {
     if (!confirmingOrder) return
     const next = nextStatusFor(confirmingOrder)
     if (!next) return
+    setError(null)
     setBusyId(confirmingOrder.id)
     try {
       await api.admin.orders.updateStatus(confirmingOrder.id, next, true)
       setConfirmingOrder(null)
       load()
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : 'Não foi possível confirmar o pagamento.')
     } finally {
       setBusyId(null)
     }
@@ -91,6 +98,8 @@ export default function AdminPedidos() {
   return (
     <div>
       <h1 className="text-2xl font-black mb-6">Pedidos</h1>
+
+      {error && <p className="error-msg mb-4">{error}</p>}
 
       <div className="flex gap-2 overflow-x-auto pb-1 mb-6 scrollbar-hide">
         {FILTERS.map((f) => (

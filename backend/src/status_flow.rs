@@ -55,13 +55,17 @@ pub fn motoboy_apply_transition(
         ("em_rota_de_entrega", "entregue") => {
             confirm_payment_if_needed(payment_method, payment_status, payment_confirmed)
         }
+        // Normally payment is already confirmed by the time an order reaches
+        // "entregue" (gated above). This also accepts payment_confirmed here
+        // as a fallback so an order can never get stuck unable to reach
+        // "concluido" if it somehow arrived at "entregue" without payment
+        // having been confirmed yet.
         ("entregue", "concluido") => {
-            if payment_status != "pago" {
-                return Err(AppError::BadRequest(
-                    "payment has not been confirmed yet".to_string(),
-                ));
+            if payment_status == "pago" {
+                Ok(false)
+            } else {
+                confirm_payment_if_needed(payment_method, payment_status, payment_confirmed)
             }
-            Ok(false)
         }
         _ => Err(AppError::BadRequest(format!(
             "invalid status transition: {current_status} -> {target_status}"
