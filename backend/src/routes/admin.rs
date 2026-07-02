@@ -7,12 +7,14 @@ use uuid::Uuid;
 use crate::auth::{hash_password, AdminUser};
 use crate::error::AppError;
 use crate::models::{
-    Category, CategoryInput, MotoboyDto, MotoboyInput, MotoboyRow, OrderDto, OrderRow,
-    ProductDto, ProductInput, ProductRow, UpdateStatusInput,
+    Category, CategoryInput, FinanceiroSummary, MotoboyDto, MotoboyInput, MotoboyRow, OrderDto,
+    OrderRow, ProductDto, ProductInput, ProductRow, ShippingRate, ShippingRateInput, StatusCount,
+    TopProduct, UpdateStatusInput,
 };
 use crate::orders_common::row_to_dto;
 use crate::state::AppState;
 use crate::status_flow;
+use crate::whatsapp;
 
 // ---------- Categories ----------
 
@@ -385,8 +387,109 @@ pub async fn update_order_status(
             .await?;
     }
 
+    if input.status == "retiradas" {
+        let digits = whatsapp::digits_only(&order.customer_whatsapp);
+        let msg = format!(
+            "Seu pedido está pronto! Pode vir buscar 😊 Local de retirada: {}",
+            state.pickup_address
+        );
+        whatsapp::notify(&state, &digits, &msg);
+    }
+
     let dto = crate::orders_common::fetch_order_dto(&state.pool, &id)
         .await?
         .ok_or_else(|| AppError::NotFound("order not found".to_string()))?;
     Ok(Json(dto))
+}
+
+// ---------- Shipping rates ----------
+
+pub async fn list_shipping_rates(
+    State(state): State<AppState>,
+    _admin: AdminUser,
+) -> Result<Json<Vec<ShippingRate>>, AppError> {
+    let rows: Vec<ShippingRate> = sqlx::query_as(
+        "SELECT neighborhood, price FROM neighborhood_shipping_rates ORDER BY neighborhood",
+    )
+    .fetch_all(&state.pool)
+    .await?;
+    Ok(Json(rows))
+}
+
+pub async fn update_shipping_rate(
+    State(state): State<AppState>,
+    _admin: AdminUser,
+    Path(neighborhood): Path<String>,
+    Json(input): Json<ShippingRateInput>,
+) -> Result<Json<ShippingRate>, AppError> {
+    sqlx::query(
+        "INSERT INTO neighborhood_shipping_rates (neighborhood, price) VALUES (?, ?) \
+         ON CONFLICT(neighborhood) DO UPDATE SET price = excluded.price",
+    )
+    .bind(&neighborhood)
+    .bind(input.price)
+    .execute(&state.pool)
+    .await?;
+    Ok(Json(ShippingRate { neighborhood, price: input.price }))
+}
+
+// ---------- Financeiro ----------
+
+pub async fn financeiro(
+    State(state): State<AppState>,
+    _admin: AdminUser,
+) -> Result<Json<FinanceiroSummary>, AppError> {
+    let total_revenue: (f64,) =
+        sqlx::query_as("SELECT COALESCE(SUM(total), 0) FROM orders WHERE payment_status = 'pago'")
+            .fetch_one(&state.pool)
+            .await?;
+
+    let total_orders: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM orders")
+        .fetch_one(&state.pool)
+        .await?;
+
+    let status_rows: Vec<(String, i64)> =
+        sqlx::query_as("SELECT status, COUNT(*) FROM orders GROUP BY status")
+            .fetch_all(&state.pool)
+            .await?;
+    let orders_by_status = status_rows
+        .into_iter()
+        .map(|(status, count)| StatusCount { status, count })
+        .collect();
+
+    let top_rows: Vec<(String, String, i64, f64)> = sqlx::query_as(
+        "SELECT oi.product_id, oi.product_name, SUM(oi.quantity) as qty, \
+         SUM(oi.unit_price * oi.quantity) as rev \
+         FROM order_items oi JOIN orders o ON o.id = oi.order_id \
+         WHERE o.payment_status = 'pago' \
+         GROUP BY oi.product_id, oi.product_name ORDER BY qty DESC LIMIT 10",
+    )
+    .fetch_all(&state.pool)
+    .await?;
+    let top_products = top_rows
+        .into_iter()
+        .map(|(product_id, product_name, quantity_sold, revenue)| TopProduct {
+            product_id,
+            product_name,
+            quantity_sold,
+            revenue,
+        })
+        .collect();
+
+    let recent_rows: Vec<OrderRow> =
+        sqlx::query_as("SELECT * FROM orders ORDER BY created_at DESC LIMIT 20")
+            .fetch_all(&state.pool)
+            .await?;
+    let mut recent_orders = Vec::with_capacity(recent_rows.len());
+    for row in recent_rows {
+        recent_orders.push(row_to_dto(&state.pool, row).await?);
+    }
+
+    Ok(Json(FinanceiroSummary {
+        total_revenue: total_revenue.0,
+        total_orders: total_orders.0,
+        orders_by_status,
+        top_products,
+        recent_orders,
+    }))
 }

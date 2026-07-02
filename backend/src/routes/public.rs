@@ -5,28 +5,23 @@ use uuid::Uuid;
 
 use crate::error::AppError;
 use crate::mercadopago;
-use crate::models::{Category, CreateOrderInput, OrderDto, ProductDto, ProductRow};
+use crate::models::{Category, CreateOrderInput, OrderDto, ProductDto, ProductRow, ShippingRate};
+use crate::neighborhoods::NEIGHBORHOODS;
 use crate::orders_common::{fetch_order_dto, fetch_order_row, row_to_dto, short_id};
 use crate::state::AppState;
 use crate::whatsapp;
 
-const NEIGHBORHOODS: &[&str] = &[
-    "Aeroclube", "Alto do Céu", "Alto do Mateus", "Anatólia", "Água Fria",
-    "Bairro das Indústrias", "Bairro dos Estados", "Bairro dos Ipês", "Bancários",
-    "Barra de Gramame", "Bessa", "Brisamar", "Cabo Branco", "Castelo Branco", "Centro",
-    "Cidade dos Colibris", "Costa do Sol", "Costa e Silva", "Cristo Redentor",
-    "Cruz das Armas", "Cuiá", "Distrito Industrial", "Ernani Sátiro", "Ernesto Geisel",
-    "Expedicionários", "Funcionários", "Geisel", "Gramame", "Grotão", "Ilha do Bispo",
-    "Jaguaribe", "Jardim Cidade Universitária", "Jardim Oceania", "Jardim São Paulo",
-    "Jardim Veneza", "José Pinheiro", "Manaíra", "Mandacaru", "Mangabeira", "Miramar",
-    "Mumbaba", "Muçumagro", "Oitizeiro", "Padre Zé", "Paratibe", "Pedro Gondim", "Penha",
-    "Planalto Boa Esperança", "Portal do Sol", "Praia do Bessa", "Range", "Roger",
-    "São José", "Tambaú", "Tambauzinho", "Tambiá", "Torre", "Treze de Maio",
-    "Trincheiras", "Valentina de Figueiredo", "Varadouro", "Varjão",
-];
-
 pub async fn neighborhoods() -> Json<Vec<&'static str>> {
     Json(NEIGHBORHOODS.to_vec())
+}
+
+pub async fn shipping_rates(State(state): State<AppState>) -> Result<Json<Vec<ShippingRate>>, AppError> {
+    let rows: Vec<ShippingRate> = sqlx::query_as(
+        "SELECT neighborhood, price FROM neighborhood_shipping_rates ORDER BY neighborhood",
+    )
+    .fetch_all(&state.pool)
+    .await?;
+    Ok(Json(rows))
 }
 
 pub async fn list_categories(State(state): State<AppState>) -> Result<Json<Vec<Category>>, AppError> {
@@ -152,6 +147,27 @@ pub async fn create_order(
         });
     }
 
+    // Shipping fee: looked up server-side from the admin-configured rate for
+    // the chosen neighborhood, never trusted from the client. Pickup orders
+    // never carry a shipping fee.
+    let shipping_price: f64 = if input.delivery_type == "entrega" {
+        match &input.neighborhood {
+            Some(n) if !n.trim().is_empty() => {
+                let row: Option<(f64,)> = sqlx::query_as(
+                    "SELECT price FROM neighborhood_shipping_rates WHERE neighborhood = ?",
+                )
+                .bind(n)
+                .fetch_optional(&mut *tx)
+                .await?;
+                row.map(|(p,)| p).unwrap_or(0.0)
+            }
+            _ => 0.0,
+        }
+    } else {
+        0.0
+    };
+    total += shipping_price;
+
     // Upsert customer by whatsapp.
     let existing_customer: Option<(String,)> =
         sqlx::query_as("SELECT id FROM customers WHERE whatsapp = ?")
@@ -193,8 +209,8 @@ pub async fn create_order(
     let order_id = Uuid::new_v4().to_string();
     sqlx::query(
         "INSERT INTO orders (id, customer_id, customer_name, customer_whatsapp, delivery_type, \
-         neighborhood, address, payment_method, payment_status, status, total) \
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pendente', 'pendente', ?)",
+         neighborhood, address, payment_method, payment_status, status, shipping_price, total) \
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pendente', 'pendente', ?, ?)",
     )
     .bind(&order_id)
     .bind(&customer_id)
@@ -204,6 +220,7 @@ pub async fn create_order(
     .bind(&input.neighborhood)
     .bind(&input.address)
     .bind(&input.payment_method)
+    .bind(shipping_price)
     .bind(total)
     .execute(&mut *tx)
     .await?;

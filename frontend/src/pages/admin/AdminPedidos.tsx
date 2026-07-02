@@ -14,18 +14,32 @@ const FILTERS = [
   { value: 'pendente', label: 'Pendentes' },
   { value: 'montando_pedido', label: 'Montando' },
   { value: 'pedido_pronto', label: 'Prontos' },
+  { value: 'retiradas', label: 'Retiradas' },
   { value: 'concluido', label: 'Concluídos' },
 ] as const
 
-const NEXT_STATUS: Record<string, string> = {
-  pendente: 'montando_pedido',
-  montando_pedido: 'pedido_pronto',
-  pedido_pronto: 'concluido',
+// pedido_pronto's next step depends on delivery_type: retirada orders move to
+// 'retiradas' (admin handles the pickup handoff); entrega orders have no admin
+// action here — the motoboy takes over via the fila.
+function nextStatusFor(order: Order): string | null {
+  switch (order.status) {
+    case 'pendente':
+      return 'montando_pedido'
+    case 'montando_pedido':
+      return 'pedido_pronto'
+    case 'pedido_pronto':
+      return order.delivery_type === 'retirada' ? 'retiradas' : null
+    case 'retiradas':
+      return 'concluido'
+    default:
+      return null
+  }
 }
 const NEXT_LABEL: Record<string, string> = {
   pendente: 'Montar pedido',
   montando_pedido: 'Marcar pronto',
-  pedido_pronto: 'Concluir (retirada)',
+  pedido_pronto: 'Pronto pra retirada',
+  retiradas: 'Concluir retirada',
 }
 
 export default function AdminPedidos() {
@@ -47,9 +61,11 @@ export default function AdminPedidos() {
       setConfirmingOrder(order)
       return
     }
+    const next = nextStatusFor(order)
+    if (!next) return
     setBusyId(order.id)
     try {
-      await api.admin.orders.updateStatus(order.id, NEXT_STATUS[order.status])
+      await api.admin.orders.updateStatus(order.id, next)
       load()
     } finally {
       setBusyId(null)
@@ -58,9 +74,11 @@ export default function AdminPedidos() {
 
   const confirmPayment = async () => {
     if (!confirmingOrder) return
+    const next = nextStatusFor(confirmingOrder)
+    if (!next) return
     setBusyId(confirmingOrder.id)
     try {
-      await api.admin.orders.updateStatus(confirmingOrder.id, NEXT_STATUS[confirmingOrder.status], true)
+      await api.admin.orders.updateStatus(confirmingOrder.id, next, true)
       setConfirmingOrder(null)
       load()
     } finally {
@@ -100,11 +118,10 @@ export default function AdminPedidos() {
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {visible.map((order) => {
-            const next = NEXT_STATUS[order.status]
-            const canAdvance =
-              !!next && !(order.status === 'pedido_pronto' && order.delivery_type === 'entrega')
+            const next = nextStatusFor(order)
+            const canAdvance = !!next
             const requiresPaymentConfirm =
-              order.status === 'pedido_pronto' && order.payment_method !== 'pix' && order.payment_status !== 'pago'
+              order.status === 'retiradas' && order.payment_method !== 'pix' && order.payment_status !== 'pago'
 
             return (
               <Card key={order.id} className="p-4">

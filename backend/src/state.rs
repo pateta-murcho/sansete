@@ -8,4 +8,5 @@ pub struct AppState {
     pub http: reqwest::Client,
     pub whatsapp_url: Arc<String>,
     pub mp_token: Arc<Option<String>>,
+    pub pickup_address: Arc<String>,
 }

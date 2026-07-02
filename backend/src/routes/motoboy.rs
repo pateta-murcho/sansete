@@ -37,6 +37,18 @@ pub async fn list_orders(
         )
         .fetch_all(&state.pool)
         .await?
+    } else if q.status == "em_rota_de_entrega" {
+        // "entregue" is a short-lived transitional status (payment confirmation
+        // may still be pending for non-pix orders) — it's shown in the same tab
+        // as "em rota" so the motoboy can find it and finish the "Concluir" step.
+        sqlx::query_as(
+            "SELECT * FROM orders WHERE delivery_type = 'entrega' \
+             AND status IN ('em_rota_de_entrega', 'entregue') AND motoboy_id = ? \
+             ORDER BY created_at DESC",
+        )
+        .bind(&claims.sub)
+        .fetch_all(&state.pool)
+        .await?
     } else {
         sqlx::query_as(
             "SELECT * FROM orders WHERE delivery_type = 'entrega' AND status = ? \

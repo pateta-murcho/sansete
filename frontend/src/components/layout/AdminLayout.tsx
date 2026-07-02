@@ -1,5 +1,5 @@
 import { Link, Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { ClipboardList, LogOut, Package, Truck } from 'lucide-react'
+import { ClipboardList, LogOut, MapPinned, Package, Truck, Wallet } from 'lucide-react'
 import Logo from '../ui/Logo'
 import { useAdminAuth } from '../../store/adminAuth'
 
@@ -7,6 +7,8 @@ const NAV_ITEMS = [
   { href: '/admin/pedidos', label: 'Pedidos', icon: ClipboardList },
   { href: '/admin/produtos', label: 'Produtos', icon: Package },
   { href: '/admin/motoboys', label: 'Motoboys', icon: Truck },
+  { href: '/admin/frete', label: 'Frete', icon: MapPinned },
+  { href: '/admin/financeiro', label: 'Financeiro', icon: Wallet },
 ]
 
 export default function AdminLayout() {

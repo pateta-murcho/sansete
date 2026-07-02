@@ -131,6 +131,7 @@ pub struct OrderRow {
     pub payment_method: String,
     pub payment_status: String,
     pub status: String,
+    pub shipping_price: f64,
     pub total: f64,
     pub motoboy_id: Option<String>,
     pub pix_payment_id: Option<String>,
@@ -161,6 +162,7 @@ pub struct OrderDto {
     pub payment_method: String,
     pub payment_status: String,
     pub status: String,
+    pub shipping_price: f64,
     pub total: f64,
     pub motoboy_id: Option<String>,
     pub pix_payment_id: Option<String>,
@@ -184,6 +186,7 @@ impl OrderDto {
             payment_method: row.payment_method,
             payment_status: row.payment_status,
             status: row.status,
+            shipping_price: row.shipping_price,
             total: row.total,
             motoboy_id: row.motoboy_id,
             pix_payment_id: row.pix_payment_id,
@@ -249,4 +252,42 @@ pub struct LoginInput {
 pub struct LoginResponse {
     pub token: String,
     pub name: String,
+}
+
+// ---------- Shipping rates ----------
+
+#[derive(Debug, sqlx::FromRow, Serialize)]
+pub struct ShippingRate {
+    pub neighborhood: String,
+    pub price: f64,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ShippingRateInput {
+    pub price: f64,
+}
+
+// ---------- Financeiro ----------
+
+#[derive(Debug, Serialize)]
+pub struct StatusCount {
+    pub status: String,
+    pub count: i64,
+}
+
+#[derive(Debug, Serialize)]
+pub struct TopProduct {
+    pub product_id: String,
+    pub product_name: String,
+    pub quantity_sold: i64,
+    pub revenue: f64,
+}
+
+#[derive(Debug, Serialize)]
+pub struct FinanceiroSummary {
+    pub total_revenue: f64,
+    pub total_orders: i64,
+    pub orders_by_status: Vec<StatusCount>,
+    pub top_products: Vec<TopProduct>,
+    pub recent_orders: Vec<OrderDto>,
 }

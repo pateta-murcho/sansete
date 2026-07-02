@@ -2,6 +2,28 @@ use sqlx::SqlitePool;
 use uuid::Uuid;
 
 use crate::auth::hash_password;
+use crate::neighborhoods::NEIGHBORHOODS;
+
+/// Seeds the shipping rates table with every João Pessoa neighborhood at
+/// R$0,00 if it's still empty. Runs independently of the admin/product seed
+/// below so it also backfills databases that were created before this table
+/// existed.
+pub async fn seed_shipping_rates_if_empty(pool: &SqlitePool) -> anyhow::Result<()> {
+    let count: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM neighborhood_shipping_rates")
+        .fetch_one(pool)
+        .await?;
+    if count.0 > 0 {
+        return Ok(());
+    }
+    for name in NEIGHBORHOODS {
+        sqlx::query("INSERT INTO neighborhood_shipping_rates (neighborhood, price) VALUES (?, 0)")
+            .bind(name)
+            .execute(pool)
+            .await?;
+    }
+    tracing::info!("seeded {} neighborhood shipping rates at R$0,00", NEIGHBORHOODS.len());
+    Ok(())
+}
 
 pub async fn seed_if_empty(pool: &SqlitePool) -> anyhow::Result<()> {
     let admin_count: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM admins")

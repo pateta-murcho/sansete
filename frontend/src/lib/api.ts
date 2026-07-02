@@ -1,6 +1,6 @@
 import { useAdminAuth } from '../store/adminAuth'
 import { useMotoboyAuth } from '../store/motoboyAuth'
-import type { Category, Motoboy, Order, Product } from './types'
+import type { Category, FinanceiroSummary, Motoboy, Order, Product, ShippingRate } from './types'
 
 export const API_BASE = 'http://localhost:8080'
 
@@ -57,6 +57,9 @@ export const api = {
   },
   neighborhoods: {
     list: () => request<string[]>('/api/neighborhoods'),
+  },
+  shippingRates: {
+    list: () => request<ShippingRate[]>('/api/shipping-rates'),
   },
   orders: {
     create: (payload: {
@@ -149,6 +152,18 @@ export const api = {
           body: JSON.stringify({ status, payment_confirmed: paymentConfirmed }),
           token: adminToken(),
         }),
+    },
+    shippingRates: {
+      list: () => request<ShippingRate[]>('/api/admin/shipping-rates', { token: adminToken() }),
+      update: (neighborhood: string, price: number) =>
+        request<ShippingRate>(`/api/admin/shipping-rates/${encodeURIComponent(neighborhood)}`, {
+          method: 'PUT',
+          body: JSON.stringify({ price }),
+          token: adminToken(),
+        }),
+    },
+    financeiro: {
+      get: () => request<FinanceiroSummary>('/api/admin/financeiro', { token: adminToken() }),
     },
   },
   motoboy: {

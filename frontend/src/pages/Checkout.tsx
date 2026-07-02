@@ -4,7 +4,7 @@ import { CreditCard, Home, Loader2, QrCode, Wallet } from 'lucide-react'
 import SiteHeader from '../components/layout/SiteHeader'
 import Autocomplete from '../components/ui/Autocomplete'
 import { api, ApiError } from '../lib/api'
-import type { PaymentMethod, Product } from '../lib/types'
+import type { PaymentMethod, Product, ShippingRate } from '../lib/types'
 import { useCart } from '../store/cart'
 import { useCustomer } from '../store/customer'
 
@@ -26,7 +26,7 @@ export default function Checkout() {
   const customer = useCustomer()
 
   const [products, setProducts] = useState<Product[]>([])
-  const [neighborhoods, setNeighborhoods] = useState<string[]>([])
+  const [shippingRates, setShippingRates] = useState<ShippingRate[]>([])
   const [pickupAtStore, setPickupAtStore] = useState(false)
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('pix')
   const [submitting, setSubmitting] = useState(false)
@@ -34,14 +34,22 @@ export default function Checkout() {
 
   useEffect(() => {
     api.products.list().then(setProducts)
-    api.neighborhoods.list().then(setNeighborhoods)
+    api.shippingRates.list().then(setShippingRates)
   }, [])
 
   const productById = useMemo(() => new Map(products.map((p) => [p.id, p])), [products])
   const lines = items
     .map((item) => ({ item, product: productById.get(item.productId) }))
     .filter((l): l is { item: typeof items[number]; product: Product } => !!l.product)
-  const total = lines.reduce((sum, l) => sum + l.product.price * l.item.quantity, 0)
+  const subtotal = lines.reduce((sum, l) => sum + l.product.price * l.item.quantity, 0)
+
+  const neighborhoods = useMemo(() => shippingRates.map((r) => r.neighborhood), [shippingRates])
+  const shippingPrice = useMemo(() => {
+    if (pickupAtStore) return 0
+    const rate = shippingRates.find((r) => r.neighborhood === customer.neighborhood)
+    return rate?.price ?? 0
+  }, [pickupAtStore, shippingRates, customer.neighborhood])
+  const total = subtotal + shippingPrice
 
   const handleSubmit = async () => {
     setError(null)
@@ -138,6 +146,11 @@ export default function Checkout() {
                   options={neighborhoods}
                   placeholder="Digite para buscar o bairro em João Pessoa..."
                 />
+                {customer.neighborhood && (
+                  <p className="text-xs text-son-silver-dim mt-1">
+                    Frete para {customer.neighborhood}: {currency(shippingPrice)}
+                  </p>
+                )}
               </div>
               <div>
                 <label className="label">Endereço (rua, número, referência)</label>
@@ -183,9 +196,19 @@ export default function Checkout() {
             )}
           </div>
 
-          <div className="border-t border-white/10 pt-4 flex justify-between items-center">
-            <span className="font-bold">Total</span>
-            <span className="sunset-text font-black text-lg">{currency(total)}</span>
+          <div className="border-t border-white/10 pt-4 space-y-1 text-sm">
+            <div className="flex justify-between text-son-silver-dim">
+              <span>Subtotal</span>
+              <span>{currency(subtotal)}</span>
+            </div>
+            <div className="flex justify-between text-son-silver-dim">
+              <span>Frete</span>
+              <span>{pickupAtStore ? 'Retirada no local' : currency(shippingPrice)}</span>
+            </div>
+            <div className="flex justify-between items-center pt-1">
+              <span className="font-bold text-white">Total</span>
+              <span className="sunset-text font-black text-lg">{currency(total)}</span>
+            </div>
           </div>
 
           {error && <p className="error-msg">{error}</p>}

@@ -5,6 +5,7 @@ export type OrderStatus =
   | 'aguardando_localizacao'
   | 'em_rota_de_entrega'
   | 'entregue'
+  | 'retiradas'
   | 'concluido'
 
 export type DeliveryType = 'entrega' | 'retirada'
@@ -46,6 +47,7 @@ export interface Order {
   payment_method: PaymentMethod
   payment_status: PaymentStatus
   status: OrderStatus
+  shipping_price: number
   total: number
   motoboy_id: string | null
   pix_payment_id?: string | null
@@ -71,5 +73,31 @@ export const STATUS_LABELS: Record<OrderStatus, string> = {
   aguardando_localizacao: 'Aguardando localização',
   em_rota_de_entrega: 'Em rota de entrega',
   entregue: 'Entregue',
+  retiradas: 'Aguardando retirada',
   concluido: 'Concluído',
+}
+
+export interface ShippingRate {
+  neighborhood: string
+  price: number
+}
+
+export interface StatusCount {
+  status: OrderStatus
+  count: number
+}
+
+export interface TopProduct {
+  product_id: string
+  product_name: string
+  quantity_sold: number
+  revenue: number
+}
+
+export interface FinanceiroSummary {
+  total_revenue: number
+  total_orders: number
+  orders_by_status: StatusCount[]
+  top_products: TopProduct[]
+  recent_orders: Order[]
 }

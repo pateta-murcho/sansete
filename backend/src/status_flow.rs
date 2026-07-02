@@ -13,11 +13,18 @@ pub fn admin_apply_transition(
     match (current_status, target_status) {
         ("pendente", "montando_pedido") => Ok(false),
         ("montando_pedido", "pedido_pronto") => Ok(false),
-        ("pedido_pronto", "concluido") => {
+        ("pedido_pronto", "retiradas") => {
             if delivery_type != "retirada" {
                 return Err(AppError::BadRequest(
-                    "only retirada orders can go directly from pedido_pronto to concluido"
-                        .to_string(),
+                    "only retirada orders can move to retiradas".to_string(),
+                ));
+            }
+            Ok(false)
+        }
+        ("retiradas", "concluido") => {
+            if delivery_type != "retirada" {
+                return Err(AppError::BadRequest(
+                    "only retirada orders can be concluded from retiradas".to_string(),
                 ));
             }
             confirm_payment_if_needed(payment_method, payment_status, payment_confirmed)
@@ -31,6 +38,11 @@ pub fn admin_apply_transition(
 /// Applies the motoboy-role portion of the order status flow. Note:
 /// pedido_pronto -> aguardando_localizacao is intentionally NOT handled here,
 /// it only happens via the bulk request-location endpoint.
+///
+/// Payment confirmation (for non-pix orders) is gated on the
+/// em_rota_de_entrega -> entregue transition, not on entregue -> concluido:
+/// the motoboy fills the payment popup right when marking the order as
+/// delivered, and the final "concluir" step is then a plain advance.
 pub fn motoboy_apply_transition(
     current_status: &str,
     target_status: &str,
@@ -40,9 +52,16 @@ pub fn motoboy_apply_transition(
 ) -> Result<bool, AppError> {
     match (current_status, target_status) {
         ("aguardando_localizacao", "em_rota_de_entrega") => Ok(false),
-        ("em_rota_de_entrega", "entregue") => Ok(false),
-        ("entregue", "concluido") => {
+        ("em_rota_de_entrega", "entregue") => {
             confirm_payment_if_needed(payment_method, payment_status, payment_confirmed)
+        }
+        ("entregue", "concluido") => {
+            if payment_status != "pago" {
+                return Err(AppError::BadRequest(
+                    "payment has not been confirmed yet".to_string(),
+                ));
+            }
+            Ok(false)
         }
         _ => Err(AppError::BadRequest(format!(
             "invalid status transition: {current_status} -> {target_status}"

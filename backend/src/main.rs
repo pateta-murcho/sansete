@@ -2,6 +2,7 @@ mod auth;
 mod error;
 mod mercadopago;
 mod models;
+mod neighborhoods;
 mod orders_common;
 mod routes;
 mod seed;
@@ -60,6 +61,9 @@ async fn main() -> anyhow::Result<()> {
         tracing::info!("MP_ACCESS_TOKEN set — using real Mercado Pago API");
     }
 
+    let pickup_address = std::env::var("STORE_PICKUP_ADDRESS")
+        .unwrap_or_else(|_| "combine o endereço pelo WhatsApp da loja".to_string());
+
     let connect_options = SqliteConnectOptions::from_str(&database_url)?.create_if_missing(true);
     let pool = SqlitePoolOptions::new()
         .max_connections(5)
@@ -69,6 +73,7 @@ async fn main() -> anyhow::Result<()> {
     sqlx::migrate!("./migrations").run(&pool).await?;
 
     seed::seed_if_empty(&pool).await?;
+    seed::seed_shipping_rates_if_empty(&pool).await?;
 
     let http = reqwest::Client::new();
 
@@ -78,6 +83,7 @@ async fn main() -> anyhow::Result<()> {
         http,
         whatsapp_url: Arc::new(whatsapp_url),
         mp_token: Arc::new(mp_token),
+        pickup_address: Arc::new(pickup_address),
     };
 
     let cors = CorsLayer::new()
@@ -94,6 +100,7 @@ async fn main() -> anyhow::Result<()> {
         .route("/api/products", get(routes::public::list_products))
         .route("/api/products/{id}", get(routes::public::get_product))
         .route("/api/neighborhoods", get(routes::public::neighborhoods))
+        .route("/api/shipping-rates", get(routes::public::shipping_rates))
         .route("/api/orders", post(routes::public::create_order))
         .route("/api/orders/track", get(routes::public::track_orders))
         .route("/api/orders/{id}", get(routes::public::get_order))
@@ -138,6 +145,15 @@ async fn main() -> anyhow::Result<()> {
         .route(
             "/api/admin/orders/{id}/status",
             patch(routes::admin::update_order_status),
+        )
+        .route("/api/admin/financeiro", get(routes::admin::financeiro))
+        .route(
+            "/api/admin/shipping-rates",
+            get(routes::admin::list_shipping_rates),
+        )
+        .route(
+            "/api/admin/shipping-rates/{neighborhood}",
+            put(routes::admin::update_shipping_rate),
         )
         // motoboy
         .route("/api/motoboy/orders", get(routes::motoboy::list_orders))

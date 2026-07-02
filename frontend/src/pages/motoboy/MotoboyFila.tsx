@@ -131,7 +131,7 @@ export default function MotoboyFila() {
           {orders.map((order) => {
             const next = NEXT_STATUS[order.status]
             const requiresPaymentConfirm =
-              order.status === 'entregue' && order.payment_method !== 'pix' && order.payment_status !== 'pago'
+              order.status === 'em_rota_de_entrega' && order.payment_method !== 'pix' && order.payment_status !== 'pago'
             return (
               <Reorder.Item
                 key={order.id}
