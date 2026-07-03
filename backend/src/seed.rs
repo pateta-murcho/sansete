@@ -1,4 +1,4 @@
-use sqlx::SqlitePool;
+use sqlx::PgPool;
 use uuid::Uuid;
 
 use crate::auth::hash_password;
@@ -8,7 +8,7 @@ use crate::neighborhoods::NEIGHBORHOODS;
 /// R$0,00 if it's still empty. Runs independently of the admin/product seed
 /// below so it also backfills databases that were created before this table
 /// existed.
-pub async fn seed_shipping_rates_if_empty(pool: &SqlitePool) -> anyhow::Result<()> {
+pub async fn seed_shipping_rates_if_empty(pool: &PgPool) -> anyhow::Result<()> {
     let count: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM neighborhood_shipping_rates")
         .fetch_one(pool)
         .await?;
@@ -16,7 +16,7 @@ pub async fn seed_shipping_rates_if_empty(pool: &SqlitePool) -> anyhow::Result<(
         return Ok(());
     }
     for name in NEIGHBORHOODS {
-        sqlx::query("INSERT INTO neighborhood_shipping_rates (neighborhood, price) VALUES (?, 0)")
+        sqlx::query("INSERT INTO neighborhood_shipping_rates (neighborhood, price) VALUES ($1, 0)")
             .bind(name)
             .execute(pool)
             .await?;
@@ -25,7 +25,7 @@ pub async fn seed_shipping_rates_if_empty(pool: &SqlitePool) -> anyhow::Result<(
     Ok(())
 }
 
-pub async fn seed_if_empty(pool: &SqlitePool) -> anyhow::Result<()> {
+pub async fn seed_if_empty(pool: &PgPool) -> anyhow::Result<()> {
     let admin_count: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM admins")
         .fetch_one(pool)
         .await?;
@@ -41,7 +41,7 @@ pub async fn seed_if_empty(pool: &SqlitePool) -> anyhow::Result<()> {
     let admin_id = Uuid::new_v4().to_string();
     let admin_password = "admin123";
     let admin_hash = hash_password(admin_password).expect("hash admin password");
-    sqlx::query("INSERT INTO admins (id, email, password_hash, name) VALUES (?, ?, ?, ?)")
+    sqlx::query("INSERT INTO admins (id, email, password_hash, name) VALUES ($1, $2, $3, $4)")
         .bind(&admin_id)
         .bind("admin@sonset.com")
         .bind(&admin_hash)
@@ -54,7 +54,7 @@ pub async fn seed_if_empty(pool: &SqlitePool) -> anyhow::Result<()> {
     let motoboy_password = "motoboy123";
     let motoboy_hash = hash_password(motoboy_password).expect("hash motoboy password");
     sqlx::query(
-        "INSERT INTO motoboys (id, name, phone, email, password_hash, active) VALUES (?, ?, ?, ?, ?, 1)",
+        "INSERT INTO motoboys (id, name, phone, email, password_hash, active) VALUES ($1, $2, $3, $4, $5, 1)",
     )
     .bind(&motoboy_id)
     .bind("Motoboy Teste")
@@ -69,7 +69,7 @@ pub async fn seed_if_empty(pool: &SqlitePool) -> anyhow::Result<()> {
     let mut category_ids = Vec::new();
     for name in categories {
         let id = Uuid::new_v4().to_string();
-        sqlx::query("INSERT INTO categories (id, name) VALUES (?, ?)")
+        sqlx::query("INSERT INTO categories (id, name) VALUES ($1, $2)")
             .bind(&id)
             .bind(name)
             .execute(pool)
@@ -90,7 +90,7 @@ pub async fn seed_if_empty(pool: &SqlitePool) -> anyhow::Result<()> {
     for (name, description, price, quantity, cat_idx) in products {
         let id = Uuid::new_v4().to_string();
         sqlx::query(
-            "INSERT INTO products (id, name, description, price, quantity, image_url, category_id, active) VALUES (?, ?, ?, ?, ?, NULL, ?, 1)",
+            "INSERT INTO products (id, name, description, price, quantity, image_url, category_id, active) VALUES ($1, $2, $3, $4, $5, NULL, $6, 1)",
         )
         .bind(&id)
         .bind(name)

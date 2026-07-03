@@ -45,7 +45,7 @@ pub async fn list_products(
             sqlx::query_as(
                 "SELECT p.*, c.name as category_name FROM products p \
                  LEFT JOIN categories c ON c.id = p.category_id \
-                 WHERE p.active = 1 AND p.category_id = ? ORDER BY p.name",
+                 WHERE p.active = 1 AND p.category_id = $1 ORDER BY p.name",
             )
             .bind(cat_id)
             .fetch_all(&state.pool)
@@ -71,7 +71,7 @@ pub async fn get_product(
     let row: Option<ProductRow> = sqlx::query_as(
         "SELECT p.*, c.name as category_name FROM products p \
          LEFT JOIN categories c ON c.id = p.category_id \
-         WHERE p.id = ? AND p.active = 1",
+         WHERE p.id = $1 AND p.active = 1",
     )
     .bind(id)
     .fetch_optional(&state.pool)
@@ -117,7 +117,7 @@ pub async fn create_order(
             return Err(AppError::BadRequest("item quantity must be positive".to_string()));
         }
         let product: Option<(String, String, f64, i64, i64)> = sqlx::query_as(
-            "SELECT id, name, price, quantity, active FROM products WHERE id = ?",
+            "SELECT id, name, price, quantity, active FROM products WHERE id = $1",
         )
         .bind(&item.product_id)
         .fetch_optional(&mut *tx)
@@ -154,7 +154,7 @@ pub async fn create_order(
         match &input.neighborhood {
             Some(n) if !n.trim().is_empty() => {
                 let row: Option<(f64,)> = sqlx::query_as(
-                    "SELECT price FROM neighborhood_shipping_rates WHERE neighborhood = ?",
+                    "SELECT price FROM neighborhood_shipping_rates WHERE neighborhood = $1",
                 )
                 .bind(n)
                 .fetch_optional(&mut *tx)
@@ -170,14 +170,14 @@ pub async fn create_order(
 
     // Upsert customer by whatsapp.
     let existing_customer: Option<(String,)> =
-        sqlx::query_as("SELECT id FROM customers WHERE whatsapp = ?")
+        sqlx::query_as("SELECT id FROM customers WHERE whatsapp = $1")
             .bind(&input.customer_whatsapp)
             .fetch_optional(&mut *tx)
             .await?;
 
     let customer_id = match existing_customer {
         Some((cid,)) => {
-            sqlx::query("UPDATE customers SET name = ? WHERE id = ?")
+            sqlx::query("UPDATE customers SET name = $1 WHERE id = $2")
                 .bind(&input.customer_name)
                 .bind(&cid)
                 .execute(&mut *tx)
@@ -186,7 +186,7 @@ pub async fn create_order(
         }
         None => {
             let cid = Uuid::new_v4().to_string();
-            sqlx::query("INSERT INTO customers (id, name, whatsapp) VALUES (?, ?, ?)")
+            sqlx::query("INSERT INTO customers (id, name, whatsapp) VALUES ($1, $2, $3)")
                 .bind(&cid)
                 .bind(&input.customer_name)
                 .bind(&input.customer_whatsapp)
@@ -198,7 +198,7 @@ pub async fn create_order(
 
     // Decrement stock.
     for li in &line_items {
-        sqlx::query("UPDATE products SET quantity = quantity - ? WHERE id = ?")
+        sqlx::query("UPDATE products SET quantity = quantity - $1 WHERE id = $2")
             .bind(li.quantity)
             .bind(&li.product_id)
             .execute(&mut *tx)
@@ -210,7 +210,7 @@ pub async fn create_order(
     sqlx::query(
         "INSERT INTO orders (id, customer_id, customer_name, customer_whatsapp, delivery_type, \
          neighborhood, address, payment_method, payment_status, status, shipping_price, total) \
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pendente', 'pendente', ?, ?)",
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'pendente', 'pendente', $9, $10)",
     )
     .bind(&order_id)
     .bind(&customer_id)
@@ -229,7 +229,7 @@ pub async fn create_order(
         let item_id = Uuid::new_v4().to_string();
         sqlx::query(
             "INSERT INTO order_items (id, order_id, product_id, product_name, unit_price, quantity) \
-             VALUES (?, ?, ?, ?, ?, ?)",
+             VALUES ($1, $2, $3, $4, $5, $6)",
         )
         .bind(&item_id)
         .bind(&order_id)
@@ -249,7 +249,7 @@ pub async fn create_order(
         match mercadopago::create_pix_payment(&state, total, &digits).await {
             Ok(pix) => {
                 sqlx::query(
-                    "UPDATE orders SET pix_payment_id = ?, pix_qr_base64 = ?, pix_copia_cola = ? WHERE id = ?",
+                    "UPDATE orders SET pix_payment_id = $1, pix_qr_base64 = $2, pix_copia_cola = $3 WHERE id = $4",
                 )
                 .bind(&pix.payment_id)
                 .bind(&pix.qr_code_base64)
@@ -292,7 +292,7 @@ pub async fn track_orders(
     Query(q): Query<TrackQuery>,
 ) -> Result<Json<Vec<OrderDto>>, AppError> {
     let rows: Vec<crate::models::OrderRow> = sqlx::query_as(
-        "SELECT * FROM orders WHERE customer_whatsapp = ? ORDER BY created_at DESC",
+        "SELECT * FROM orders WHERE customer_whatsapp = $1 ORDER BY created_at DESC",
     )
     .bind(&q.whatsapp)
     .fetch_all(&state.pool)
@@ -324,7 +324,7 @@ pub async fn refresh_payment(
 
     let status = mercadopago::get_payment_status(&state, &payment_id).await?;
     if status == "approved" {
-        sqlx::query("UPDATE orders SET payment_status = 'pago', updated_at = datetime('now') WHERE id = ?")
+        sqlx::query("UPDATE orders SET payment_status = 'pago', updated_at = now()::text WHERE id = $1")
             .bind(&id)
             .execute(&state.pool)
             .await?;
@@ -361,7 +361,7 @@ pub async fn simulate_pix_paid(
     }
 
     if order.payment_status != "pago" {
-        sqlx::query("UPDATE orders SET payment_status = 'pago', updated_at = datetime('now') WHERE id = ?")
+        sqlx::query("UPDATE orders SET payment_status = 'pago', updated_at = now()::text WHERE id = $1")
             .bind(&id)
             .execute(&state.pool)
             .await?;

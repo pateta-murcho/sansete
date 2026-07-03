@@ -2,7 +2,9 @@ import { useAdminAuth } from '../store/adminAuth'
 import { useMotoboyAuth } from '../store/motoboyAuth'
 import type { Category, FinanceiroSummary, Motoboy, Order, Product, ShippingRate } from './types'
 
-export const API_BASE = 'http://localhost:8080'
+// Set VITE_API_BASE_URL in the Vercel project's environment variables once
+// the backend is deployed (Railway). Falls back to local dev.
+export const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080'
 
 class ApiError extends Error {
   status: number

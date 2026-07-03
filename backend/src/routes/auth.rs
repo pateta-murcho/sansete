@@ -11,7 +11,7 @@ pub async fn admin_login(
     Json(input): Json<LoginInput>,
 ) -> Result<Json<LoginResponse>, AppError> {
     let row: Option<(String, String, String)> =
-        sqlx::query_as("SELECT id, password_hash, name FROM admins WHERE email = ?")
+        sqlx::query_as("SELECT id, password_hash, name FROM admins WHERE email = $1")
             .bind(&input.email)
             .fetch_optional(&state.pool)
             .await?;
@@ -32,7 +32,7 @@ pub async fn motoboy_login(
     Json(input): Json<LoginInput>,
 ) -> Result<Json<LoginResponse>, AppError> {
     let row: Option<(String, String, String, i64)> = sqlx::query_as(
-        "SELECT id, password_hash, name, active FROM motoboys WHERE email = ?",
+        "SELECT id, password_hash, name, active FROM motoboys WHERE email = $1",
     )
     .bind(&input.email)
     .fetch_optional(&state.pool)

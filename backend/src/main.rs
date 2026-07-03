@@ -17,8 +17,8 @@ use axum::http::HeaderValue;
 use axum::routing::{get, patch, post, put};
 use axum::Router;
 use rand::Rng;
-use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
-use tower_http::cors::{Any, CorsLayer};
+use sqlx::postgres::{PgConnectOptions, PgPoolOptions};
+use tower_http::cors::{AllowOrigin, CorsLayer};
 use tower_http::trace::TraceLayer;
 
 use state::AppState;
@@ -35,8 +35,8 @@ async fn main() -> anyhow::Result<()> {
     dotenvy::dotenv().ok();
     tracing_subscriber::fmt::init();
 
-    let database_url =
-        std::env::var("DATABASE_URL").unwrap_or_else(|_| "sqlite://dev.db".to_string());
+    let database_url = std::env::var("DATABASE_URL")
+        .expect("DATABASE_URL must be set (Postgres connection string, e.g. Supabase)");
 
     let jwt_secret = match std::env::var("JWT_SECRET") {
         Ok(s) if !s.is_empty() => s,
@@ -64,8 +64,8 @@ async fn main() -> anyhow::Result<()> {
     let pickup_address = std::env::var("STORE_PICKUP_ADDRESS")
         .unwrap_or_else(|_| "combine o endereço pelo WhatsApp da loja".to_string());
 
-    let connect_options = SqliteConnectOptions::from_str(&database_url)?.create_if_missing(true);
-    let pool = SqlitePoolOptions::new()
+    let connect_options = PgConnectOptions::from_str(&database_url)?;
+    let pool = PgPoolOptions::new()
         .max_connections(5)
         .connect_with(connect_options)
         .await?;
@@ -86,10 +86,23 @@ async fn main() -> anyhow::Result<()> {
         pickup_address: Arc::new(pickup_address),
     };
 
+    // CORS_ORIGINS: comma-separated list of allowed frontend origins. Defaults
+    // to local dev plus the Vercel domains this project is meant to deploy to.
+    let cors_origins: Vec<HeaderValue> = std::env::var("CORS_ORIGINS")
+        .unwrap_or_else(|_| {
+            "http://localhost:5173,https://sonset.vercel.app,https://sonset-tabacaria.vercel.app"
+                .to_string()
+        })
+        .split(',')
+        .filter(|s| !s.trim().is_empty())
+        .map(|s| s.trim().parse::<HeaderValue>())
+        .collect::<Result<_, _>>()?;
+    tracing::info!("CORS allowed origins: {:?}", cors_origins);
+
     let cors = CorsLayer::new()
-        .allow_origin("http://localhost:5173".parse::<HeaderValue>()?)
-        .allow_methods(Any)
-        .allow_headers(Any);
+        .allow_origin(AllowOrigin::list(cors_origins))
+        .allow_methods(tower_http::cors::Any)
+        .allow_headers(tower_http::cors::Any);
 
     let app = Router::new()
         // auth
@@ -169,8 +182,12 @@ async fn main() -> anyhow::Result<()> {
         .layer(TraceLayer::new_for_http())
         .with_state(state);
 
-    let listener = tokio::net::TcpListener::bind("127.0.0.1:8080").await?;
-    tracing::info!("sonset_backend listening on http://127.0.0.1:8080");
+    // Bind to 0.0.0.0 so this also works inside a container (Railway etc, which
+    // injects PORT); locally it's still reachable at http://localhost:<port>.
+    let port = std::env::var("PORT").unwrap_or_else(|_| "8080".to_string());
+    let addr = format!("0.0.0.0:{port}");
+    let listener = tokio::net::TcpListener::bind(&addr).await?;
+    tracing::info!("sonset_backend listening on http://{addr}");
     axum::serve(listener, app).await?;
 
     Ok(())

@@ -43,7 +43,7 @@ pub async fn list_orders(
         // as "em rota" so the motoboy can find it and finish the "Concluir" step.
         sqlx::query_as(
             "SELECT * FROM orders WHERE delivery_type = 'entrega' \
-             AND status IN ('em_rota_de_entrega', 'entregue') AND motoboy_id = ? \
+             AND status IN ('em_rota_de_entrega', 'entregue') AND motoboy_id = $1 \
              ORDER BY created_at DESC",
         )
         .bind(&claims.sub)
@@ -51,8 +51,8 @@ pub async fn list_orders(
         .await?
     } else {
         sqlx::query_as(
-            "SELECT * FROM orders WHERE delivery_type = 'entrega' AND status = ? \
-             AND motoboy_id = ? ORDER BY created_at DESC",
+            "SELECT * FROM orders WHERE delivery_type = 'entrega' AND status = $1 \
+             AND motoboy_id = $2 ORDER BY created_at DESC",
         )
         .bind(&q.status)
         .bind(&claims.sub)
@@ -107,7 +107,7 @@ pub async fn request_location(
         }
 
         sqlx::query(
-            "UPDATE orders SET motoboy_id = ?, status = 'aguardando_localizacao', updated_at = datetime('now') WHERE id = ?",
+            "UPDATE orders SET motoboy_id = $1, status = 'aguardando_localizacao', updated_at = now()::text WHERE id = $2",
         )
         .bind(&claims.sub)
         .bind(&order_id)
@@ -154,14 +154,14 @@ pub async fn update_order_status(
 
     if set_paid {
         sqlx::query(
-            "UPDATE orders SET status = ?, payment_status = 'pago', updated_at = datetime('now') WHERE id = ?",
+            "UPDATE orders SET status = $1, payment_status = 'pago', updated_at = now()::text WHERE id = $2",
         )
         .bind(&input.status)
         .bind(&id)
         .execute(&state.pool)
         .await?;
     } else {
-        sqlx::query("UPDATE orders SET status = ?, updated_at = datetime('now') WHERE id = ?")
+        sqlx::query("UPDATE orders SET status = $1, updated_at = now()::text WHERE id = $2")
             .bind(&input.status)
             .bind(&id)
             .execute(&state.pool)

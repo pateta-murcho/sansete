@@ -7,7 +7,7 @@ backend em Rust (Axum), microserviço de WhatsApp em Node (whatsapp-web.js).
 
 ```
 frontend/            React + Vite + TS + Tailwind v4 + Framer Motion + Zustand + React Router
-backend/              Rust + Axum + SQLx (SQLite local) — API na porta 8080
+backend/              Rust + Axum + SQLx (Postgres/Supabase) — API na porta 8080
 whatsapp-gateway/     Node + Express + whatsapp-web.js — mensageria na porta 3001
 ```
 
@@ -35,11 +35,13 @@ Acesse `http://localhost:5173`.
 
 ## Banco de dados
 
-Por enquanto local (SQLite, `backend/dev.db`, criado e migrado automaticamente no primeiro
-`cargo run`). Quando for migrar para Supabase/Postgres, será preciso adaptar
-`backend/migrations/*.sql` para o dialeto Postgres e trocar a `DATABASE_URL` — as credenciais de
-API do Supabase (anon/service_role) que você já tem **não** servem para conexão direta via
-`sqlx` (é preciso a senha do Postgres, em Project Settings → Database).
+Postgres do Supabase (projeto `zncpcsdpdkvjfknmmhpu`), configurado via `DATABASE_URL` em
+`backend/.env`. As migrations (`backend/migrations/*.sql`) rodam automaticamente a cada
+`cargo run` (via `sqlx::migrate!`), então subir o backend já deixa o schema em dia — não precisa
+rodar nada manual no SQL Editor do Supabase.
+
+Import: as credenciais de API do Supabase (anon/service_role) **não** servem pra conexão direta
+via `sqlx` — é preciso a senha do Postgres (Project Settings → Database → Connection string).
 
 ## Credenciais de teste (seed automático)
 
@@ -66,5 +68,24 @@ terminal) e escaneie pelo WhatsApp do celular em Aparelhos conectados → Conect
 ## Rotas
 
 **Cliente:** `/`, `/catalogo`, `/produto/:id`, `/carrinho`, `/checkout`, `/pagamento/:orderId`, `/consultar`
-**Admin:** `/admin/login`, `/admin/pedidos`, `/admin/produtos`, `/admin/motoboys`
+**Admin:** `/admin/login`, `/admin/pedidos`, `/admin/produtos`, `/admin/motoboys`, `/admin/frete`, `/admin/financeiro`
 **Motoboy:** `/motoboy/login`, `/motoboy`
+
+## Deploy
+
+**Banco (Supabase):** já em produção — o Postgres do Supabase é o único banco usado agora,
+inclusive em desenvolvimento local (não tem mais SQLite).
+
+**Frontend (Vercel):** conecte este repositório, com:
+- **Root Directory:** `frontend`
+- Framework, build command e output directory são detectados automaticamente via
+  `frontend/vercel.json` (Vite, `npm run build`, `dist/`, com rewrite de SPA pra rotas do
+  React Router funcionarem em navegação direta).
+- **Nome do projeto:** escolha `sonset` ou `sonset-tabacaria` na criação — é isso que define o
+  subdomínio (`sonset.vercel.app` / `sonset-tabacaria.vercel.app`). O backend já libera CORS pros
+  dois por padrão.
+- **Variável de ambiente:** `VITE_API_BASE_URL` apontando pra URL do backend no Railway. Sem
+  essa variável, o frontend tenta falar com `localhost:8080` e nada funciona em produção — só
+  configure depois que o backend estiver no ar.
+
+**Backend (Railway) e WhatsApp gateway:** ainda não configurados — próximo passo.

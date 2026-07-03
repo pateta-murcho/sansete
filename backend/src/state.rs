@@ -1,9 +1,9 @@
-use sqlx::SqlitePool;
+use sqlx::PgPool;
 use std::sync::Arc;
 
 #[derive(Clone)]
 pub struct AppState {
-    pub pool: SqlitePool,
+    pub pool: PgPool,
     pub jwt_secret: Arc<String>,
     pub http: reqwest::Client,
     pub whatsapp_url: Arc<String>,

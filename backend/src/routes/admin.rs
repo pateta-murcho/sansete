@@ -37,7 +37,7 @@ pub async fn create_category(
         return Err(AppError::BadRequest("name is required".to_string()));
     }
     let id = Uuid::new_v4().to_string();
-    sqlx::query("INSERT INTO categories (id, name) VALUES (?, ?)")
+    sqlx::query("INSERT INTO categories (id, name) VALUES ($1, $2)")
         .bind(&id)
         .bind(&input.name)
         .execute(&state.pool)
@@ -57,7 +57,7 @@ pub async fn update_category(
     Path(id): Path<String>,
     Json(input): Json<CategoryInput>,
 ) -> Result<Json<Category>, AppError> {
-    let result = sqlx::query("UPDATE categories SET name = ? WHERE id = ?")
+    let result = sqlx::query("UPDATE categories SET name = $1 WHERE id = $2")
         .bind(&input.name)
         .bind(&id)
         .execute(&state.pool)
@@ -73,7 +73,7 @@ pub async fn delete_category(
     _admin: AdminUser,
     Path(id): Path<String>,
 ) -> Result<StatusCode, AppError> {
-    let result = sqlx::query("DELETE FROM categories WHERE id = ?")
+    let result = sqlx::query("DELETE FROM categories WHERE id = $1")
         .bind(&id)
         .execute(&state.pool)
         .await?;
@@ -103,7 +103,7 @@ pub async fn get_product(
     _admin: AdminUser,
     Path(id): Path<String>,
 ) -> Result<Json<ProductDto>, AppError> {
-    let row: Option<ProductRow> = sqlx::query_as(&format!("{PRODUCT_SELECT} WHERE p.id = ?"))
+    let row: Option<ProductRow> = sqlx::query_as(&format!("{PRODUCT_SELECT} WHERE p.id = $1"))
         .bind(&id)
         .fetch_optional(&state.pool)
         .await?;
@@ -125,7 +125,7 @@ pub async fn create_product(
     let active = input.active.unwrap_or(true);
     sqlx::query(
         "INSERT INTO products (id, name, description, price, quantity, image_url, category_id, active) \
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
     )
     .bind(&id)
     .bind(&input.name)
@@ -138,7 +138,7 @@ pub async fn create_product(
     .execute(&state.pool)
     .await?;
 
-    let row: ProductRow = sqlx::query_as(&format!("{PRODUCT_SELECT} WHERE p.id = ?"))
+    let row: ProductRow = sqlx::query_as(&format!("{PRODUCT_SELECT} WHERE p.id = $1"))
         .bind(&id)
         .fetch_one(&state.pool)
         .await?;
@@ -153,8 +153,8 @@ pub async fn update_product(
 ) -> Result<Json<ProductDto>, AppError> {
     let active = input.active.unwrap_or(true);
     let result = sqlx::query(
-        "UPDATE products SET name = ?, description = ?, price = ?, quantity = ?, image_url = ?, \
-         category_id = ?, active = ? WHERE id = ?",
+        "UPDATE products SET name = $1, description = $2, price = $3, quantity = $4, image_url = $5, \
+         category_id = $6, active = $7 WHERE id = $8",
     )
     .bind(&input.name)
     .bind(&input.description)
@@ -171,7 +171,7 @@ pub async fn update_product(
         return Err(AppError::NotFound("product not found".to_string()));
     }
 
-    let row: ProductRow = sqlx::query_as(&format!("{PRODUCT_SELECT} WHERE p.id = ?"))
+    let row: ProductRow = sqlx::query_as(&format!("{PRODUCT_SELECT} WHERE p.id = $1"))
         .bind(&id)
         .fetch_one(&state.pool)
         .await?;
@@ -183,7 +183,7 @@ pub async fn delete_product(
     _admin: AdminUser,
     Path(id): Path<String>,
 ) -> Result<StatusCode, AppError> {
-    let result = sqlx::query("DELETE FROM products WHERE id = ?")
+    let result = sqlx::query("DELETE FROM products WHERE id = $1")
         .bind(&id)
         .execute(&state.pool)
         .await?;
@@ -210,7 +210,7 @@ pub async fn get_motoboy(
     _admin: AdminUser,
     Path(id): Path<String>,
 ) -> Result<Json<MotoboyDto>, AppError> {
-    let row: Option<MotoboyRow> = sqlx::query_as("SELECT * FROM motoboys WHERE id = ?")
+    let row: Option<MotoboyRow> = sqlx::query_as("SELECT * FROM motoboys WHERE id = $1")
         .bind(&id)
         .fetch_optional(&state.pool)
         .await?;
@@ -233,7 +233,7 @@ pub async fn create_motoboy(
     let active = input.active.unwrap_or(true);
 
     sqlx::query(
-        "INSERT INTO motoboys (id, name, phone, email, password_hash, active) VALUES (?, ?, ?, ?, ?, ?)",
+        "INSERT INTO motoboys (id, name, phone, email, password_hash, active) VALUES ($1, $2, $3, $4, $5, $6)",
     )
     .bind(&id)
     .bind(&input.name)
@@ -250,7 +250,7 @@ pub async fn create_motoboy(
         other => other.into(),
     })?;
 
-    let row: MotoboyRow = sqlx::query_as("SELECT * FROM motoboys WHERE id = ?")
+    let row: MotoboyRow = sqlx::query_as("SELECT * FROM motoboys WHERE id = $1")
         .bind(&id)
         .fetch_one(&state.pool)
         .await?;
@@ -268,7 +268,7 @@ pub async fn update_motoboy(
     if let Some(password) = input.password.as_deref().filter(|p| !p.is_empty()) {
         let hash = hash_password(password)?;
         let result = sqlx::query(
-            "UPDATE motoboys SET name = ?, phone = ?, email = ?, password_hash = ?, active = ? WHERE id = ?",
+            "UPDATE motoboys SET name = $1, phone = $2, email = $3, password_hash = $4, active = $5 WHERE id = $6",
         )
         .bind(&input.name)
         .bind(&input.phone)
@@ -283,7 +283,7 @@ pub async fn update_motoboy(
         }
     } else {
         let result = sqlx::query(
-            "UPDATE motoboys SET name = ?, phone = ?, email = ?, active = ? WHERE id = ?",
+            "UPDATE motoboys SET name = $1, phone = $2, email = $3, active = $4 WHERE id = $5",
         )
         .bind(&input.name)
         .bind(&input.phone)
@@ -297,7 +297,7 @@ pub async fn update_motoboy(
         }
     }
 
-    let row: MotoboyRow = sqlx::query_as("SELECT * FROM motoboys WHERE id = ?")
+    let row: MotoboyRow = sqlx::query_as("SELECT * FROM motoboys WHERE id = $1")
         .bind(&id)
         .fetch_one(&state.pool)
         .await?;
@@ -309,7 +309,7 @@ pub async fn delete_motoboy(
     _admin: AdminUser,
     Path(id): Path<String>,
 ) -> Result<StatusCode, AppError> {
-    let result = sqlx::query("DELETE FROM motoboys WHERE id = ?")
+    let result = sqlx::query("DELETE FROM motoboys WHERE id = $1")
         .bind(&id)
         .execute(&state.pool)
         .await?;
@@ -333,7 +333,7 @@ pub async fn list_orders(
 ) -> Result<Json<Vec<OrderDto>>, AppError> {
     let rows: Vec<OrderRow> = match q.status {
         Some(status) => {
-            sqlx::query_as("SELECT * FROM orders WHERE status = ? ORDER BY created_at DESC")
+            sqlx::query_as("SELECT * FROM orders WHERE status = $1 ORDER BY created_at DESC")
                 .bind(status)
                 .fetch_all(&state.pool)
                 .await?
@@ -373,14 +373,14 @@ pub async fn update_order_status(
 
     if set_paid {
         sqlx::query(
-            "UPDATE orders SET status = ?, payment_status = 'pago', updated_at = datetime('now') WHERE id = ?",
+            "UPDATE orders SET status = $1, payment_status = 'pago', updated_at = now()::text WHERE id = $2",
         )
         .bind(&input.status)
         .bind(&id)
         .execute(&state.pool)
         .await?;
     } else {
-        sqlx::query("UPDATE orders SET status = ?, updated_at = datetime('now') WHERE id = ?")
+        sqlx::query("UPDATE orders SET status = $1, updated_at = now()::text WHERE id = $2")
             .bind(&input.status)
             .bind(&id)
             .execute(&state.pool)
@@ -423,8 +423,8 @@ pub async fn update_shipping_rate(
     Json(input): Json<ShippingRateInput>,
 ) -> Result<Json<ShippingRate>, AppError> {
     sqlx::query(
-        "INSERT INTO neighborhood_shipping_rates (neighborhood, price) VALUES (?, ?) \
-         ON CONFLICT(neighborhood) DO UPDATE SET price = excluded.price",
+        "INSERT INTO neighborhood_shipping_rates (neighborhood, price) VALUES ($1, $2) \
+         ON CONFLICT (neighborhood) DO UPDATE SET price = EXCLUDED.price",
     )
     .bind(&neighborhood)
     .bind(input.price)
@@ -439,10 +439,11 @@ pub async fn financeiro(
     State(state): State<AppState>,
     _admin: AdminUser,
 ) -> Result<Json<FinanceiroSummary>, AppError> {
-    let total_revenue: (f64,) =
-        sqlx::query_as("SELECT COALESCE(SUM(total), 0) FROM orders WHERE payment_status = 'pago'")
-            .fetch_one(&state.pool)
-            .await?;
+    let total_revenue: (f64,) = sqlx::query_as(
+        "SELECT COALESCE(SUM(total), 0)::double precision FROM orders WHERE payment_status = 'pago'",
+    )
+    .fetch_one(&state.pool)
+    .await?;
 
     let total_orders: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM orders")
         .fetch_one(&state.pool)
@@ -457,9 +458,11 @@ pub async fn financeiro(
         .map(|(status, count)| StatusCount { status, count })
         .collect();
 
+    // SUM() over bigint/double precision in Postgres returns numeric, so the
+    // aggregates are cast explicitly back to the types sqlx expects here.
     let top_rows: Vec<(String, String, i64, f64)> = sqlx::query_as(
-        "SELECT oi.product_id, oi.product_name, SUM(oi.quantity) as qty, \
-         SUM(oi.unit_price * oi.quantity) as rev \
+        "SELECT oi.product_id, oi.product_name, SUM(oi.quantity)::bigint as qty, \
+         SUM(oi.unit_price * oi.quantity)::double precision as rev \
          FROM order_items oi JOIN orders o ON o.id = oi.order_id \
          WHERE o.payment_status = 'pago' \
          GROUP BY oi.product_id, oi.product_name ORDER BY qty DESC LIMIT 10",
