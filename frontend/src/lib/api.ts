@@ -1,18 +1,20 @@
 import { useAdminAuth } from '../store/adminAuth'
 import { useMotoboyAuth } from '../store/motoboyAuth'
+import { ApiError } from './apiError'
+import { localApi } from './localApi'
 import type { Category, FinanceiroSummary, Motoboy, Order, Product, ShippingRate } from './types'
 
 // Set VITE_API_BASE_URL in the Vercel project's environment variables once
 // the backend is deployed (Railway). Falls back to local dev.
 export const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080'
 
-class ApiError extends Error {
-  status: number
-  constructor(status: number, message: string) {
-    super(message)
-    this.status = status
-  }
-}
+// No backend configured in production (e.g. deployed on Vercel alone, before
+// Railway is set up) -> fall back to a localStorage-backed mock so the site
+// can still be demoed end-to-end. Force it on with VITE_USE_LOCAL_DB=true;
+// local dev keeps hitting the real backend at localhost:8080 by default.
+export const USE_LOCAL_DB =
+  import.meta.env.VITE_USE_LOCAL_DB === 'true' ||
+  (import.meta.env.PROD && !import.meta.env.VITE_API_BASE_URL)
 
 async function request<T>(
   path: string,
@@ -48,7 +50,7 @@ function motoboyToken() {
   return useMotoboyAuth.getState().token ?? undefined
 }
 
-export const api = {
+const remoteApi = {
   categories: {
     list: () => request<Category[]>('/api/categories'),
   },
@@ -190,5 +192,7 @@ export const api = {
     },
   },
 }
+
+export const api = USE_LOCAL_DB ? localApi : remoteApi
 
 export { ApiError }

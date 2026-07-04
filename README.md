@@ -85,7 +85,28 @@ inclusive em desenvolvimento local (não tem mais SQLite).
   subdomínio (`sonset.vercel.app` / `sonset-tabacaria.vercel.app`). O backend já libera CORS pros
   dois por padrão.
 - **Variável de ambiente:** `VITE_API_BASE_URL` apontando pra URL do backend no Railway. Sem
-  essa variável, o frontend tenta falar com `localhost:8080` e nada funciona em produção — só
-  configure depois que o backend estiver no ar.
+  essa variável, em produção o site entra automaticamente em **modo demonstração** (ver abaixo)
+  em vez de tentar falar com `localhost:8080`.
 
 **Backend (Railway) e WhatsApp gateway:** ainda não configurados — próximo passo.
+
+## Modo demonstração (sem backend)
+
+Enquanto o backend não está publicado (Railway pendente), o site em produção roda 100% no
+navegador: todo o catálogo, pedidos, motoboys e financeiro ficam salvos no `localStorage` do
+próprio visitante, com a mesma lógica de negócio do backend (fluxo de status, estoque, frete,
+Pix mock) reimplementada em `frontend/src/lib/localApi.ts`. Isso ativa sozinho quando não há
+`VITE_API_BASE_URL` configurada em build de produção (`import.meta.env.PROD`) — em dev local
+(`npm run dev`) continua batendo no backend real em `localhost:8080` normalmente.
+
+Implicações de ser só local:
+- Cada navegador/aba tem seus próprios dados — não é compartilhado entre visitantes nem entre
+  dispositivos, e reseta se o usuário limpar o site data do navegador.
+- Login de motoboy/admin usa as mesmas credenciais de sempre (`admin@sonset.com`/`admin123`,
+  `motoboy@sonset.com`/`motoboy123`), verificadas no próprio navegador.
+- Pix fica sempre em modo mock (sem Mercado Pago de verdade) e o WhatsApp só loga no console do
+  navegador (`[demo] WhatsApp para ...`) em vez de mandar mensagem de verdade.
+- Para forçar esse modo mesmo com um backend configurado (ou forçar desligar), defina
+  `VITE_USE_LOCAL_DB=true` (ou `false`) nas env vars do projeto.
+- Quando o Railway estiver no ar, basta configurar `VITE_API_BASE_URL` na Vercel e fazer
+  redeploy — o site volta a usar o backend real automaticamente, sem mexer em código.
