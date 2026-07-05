@@ -76,14 +76,13 @@ terminal) e escaneie pelo WhatsApp do celular em Aparelhos conectados → Conect
 **Banco (Supabase):** já em produção — o Postgres do Supabase é o único banco usado agora,
 inclusive em desenvolvimento local (não tem mais SQLite).
 
-**Frontend (Vercel):** conecte este repositório, com:
-- **Root Directory:** `frontend`
+**Frontend (Vercel):** já em produção em https://sunset-tabas.app (domínio próprio, configurado
+manualmente no dashboard da Vercel — projeto chamado `sonset`, root directory `frontend`).
 - Framework, build command e output directory são detectados automaticamente via
   `frontend/vercel.json` (Vite, `npm run build`, `dist/`, com rewrite de SPA pra rotas do
   React Router funcionarem em navegação direta).
-- **Nome do projeto:** escolha `sonset` ou `sonset-tabacaria` na criação — é isso que define o
-  subdomínio (`sonset.vercel.app` / `sonset-tabacaria.vercel.app`). O backend já libera CORS pros
-  dois por padrão.
+- O backend já libera CORS por padrão pra `https://sunset-tabas.app` e
+  `https://www.sunset-tabas.app` (variável `CORS_ORIGINS`, comma-separated, caso mude de novo).
 - **Variável de ambiente:** `VITE_API_BASE_URL` apontando pra URL do backend no Railway. Sem
   essa variável, em produção o site entra automaticamente em **modo demonstração** (ver abaixo)
   em vez de tentar falar com `localhost:8080`.

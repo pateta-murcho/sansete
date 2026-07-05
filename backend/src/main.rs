@@ -87,10 +87,10 @@ async fn main() -> anyhow::Result<()> {
     };
 
     // CORS_ORIGINS: comma-separated list of allowed frontend origins. Defaults
-    // to local dev plus the Vercel domains this project is meant to deploy to.
+    // to local dev plus the production domain this project deploys to.
     let cors_origins: Vec<HeaderValue> = std::env::var("CORS_ORIGINS")
         .unwrap_or_else(|_| {
-            "http://localhost:5173,https://sonset.vercel.app,https://sonset-tabacaria.vercel.app"
+            "http://localhost:5173,https://sunset-tabas.app,https://www.sunset-tabas.app,https://sonset.vercel.app"
                 .to_string()
         })
         .split(',')
