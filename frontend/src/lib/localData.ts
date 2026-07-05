@@ -27,7 +27,7 @@ export interface LocalDb {
   shippingRates: ShippingRate[]
 }
 
-export const ADMIN_CREDENTIALS = { email: 'admin@sonset.com', password: 'admin123', name: 'Admin Sonset' }
+export const ADMIN_CREDENTIALS = { email: 'admin@sonset.com', password: 'admin123', name: 'Admin Sunset Tabas' }
 export const FAKE_MOTOBOY_ID = 'local-motoboy-seed'
 
 const STORAGE_KEY = 'sonset_local_db_v1'

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { Loader2, Package, Search } from 'lucide-react'
 import SiteHeader from '../components/layout/SiteHeader'
+import WhatsAppFab from '../components/WhatsAppFab'
 import { StatusBadge } from '../components/ui/Badge'
 import { api } from '../lib/api'
 import type { Order } from '../lib/types'
@@ -55,6 +56,7 @@ export default function Consultar() {
   return (
     <main className="min-h-screen bg-son-black text-white">
       <SiteHeader />
+      <WhatsAppFab />
       <div className="max-w-xl mx-auto px-5 sm:px-10 pb-20">
         <h1 className="text-2xl sm:text-3xl font-black mb-1">Acompanhar pedido</h1>
         <p className="text-son-silver-dim text-sm mb-6">Informe o WhatsApp usado na compra.</p>

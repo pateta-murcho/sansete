@@ -45,7 +45,7 @@ pub async fn seed_if_empty(pool: &PgPool) -> anyhow::Result<()> {
         .bind(&admin_id)
         .bind("admin@sonset.com")
         .bind(&admin_hash)
-        .bind("Admin Sonset")
+        .bind("Admin Sunset Tabas")
         .execute(pool)
         .await?;
 
@@ -103,7 +103,7 @@ pub async fn seed_if_empty(pool: &PgPool) -> anyhow::Result<()> {
     }
 
     println!("========================================");
-    println!(" Sonset backend — seeded credentials");
+    println!(" Sunset Tabas backend — seeded credentials");
     println!("----------------------------------------");
     println!(" Admin:    admin@sonset.com / {admin_password}");
     println!(" Motoboy:  motoboy@sonset.com / {motoboy_password}");

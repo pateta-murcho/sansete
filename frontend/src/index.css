@@ -1,15 +1,15 @@
 @import "tailwindcss";
 
 @theme {
-  --color-son-black: #0b0710;
-  --color-son-surface: #171022;
-  --color-son-surface-light: #241a33;
-  --color-son-orange: #ff7a3d;
-  --color-son-pink: #ff3d7f;
-  --color-son-purple: #b83dff;
+  --color-son-black: #081912;
+  --color-son-surface: #0f2b1d;
+  --color-son-surface-light: #1a4530;
+  --color-son-orange: #e08a3a;
+  --color-son-pink: #d5aa45;
+  --color-son-purple: #b57c27;
   --color-son-gold: #ffd23d;
-  --color-son-silver: #d9d2e3;
-  --color-son-silver-dim: #9187a3;
+  --color-son-silver: #ece4cf;
+  --color-son-silver-dim: #a79b7f;
 
   --font-sans: 'Poppins', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
 }
@@ -32,7 +32,7 @@ body,
 
 body {
   margin: 0;
-  background: radial-gradient(120% 120% at 50% -10%, #2a1638 0%, #0b0710 55%), var(--background);
+  background: radial-gradient(120% 120% at 50% -10%, #173d28 0%, #081912 55%), var(--background);
   background-attachment: fixed;
   color: var(--foreground);
   font-family: var(--font-sans);
@@ -46,7 +46,7 @@ a {
 
 ::selection {
   background: var(--color-son-pink);
-  color: white;
+  color: #081912;
 }
 
 .sunset-text {
@@ -61,15 +61,15 @@ a {
 }
 
 .glow-sm {
-  box-shadow: 0 0 12px 0 rgba(255, 61, 127, 0.35);
+  box-shadow: 0 0 8px 0 rgba(242, 193, 78, 0.16);
 }
 
 .glow {
-  box-shadow: 0 0 24px 2px rgba(255, 61, 127, 0.35), 0 0 60px 8px rgba(184, 61, 255, 0.15);
+  box-shadow: 0 0 16px 2px rgba(242, 193, 78, 0.16), 0 0 40px 8px rgba(201, 138, 44, 0.1);
 }
 
 .glass {
-  background: rgba(23, 16, 34, 0.6);
+  background: rgba(15, 43, 29, 0.65);
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
   border: 1px solid rgba(255, 255, 255, 0.06);
@@ -83,7 +83,8 @@ a {
   .btn-primary {
     @apply text-white font-semibold py-3 px-6 rounded-2xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2 hover:brightness-110 hover:scale-[1.02] active:scale-[0.98];
     background: linear-gradient(135deg, var(--color-son-orange), var(--color-son-pink) 55%, var(--color-son-purple));
-    box-shadow: 0 0 12px 0 rgba(255, 61, 127, 0.35);
+    box-shadow: 0 0 8px 0 rgba(242, 193, 78, 0.16);
+    color: #081912;
   }
 
   .btn-secondary {
@@ -116,4 +117,37 @@ a {
 .scrollbar-hide {
   -ms-overflow-style: none;
   scrollbar-width: none;
+}
+
+/* "Typing…" bubble on the WhatsApp FAB: each dot hops up-and-down 3 times in
+   a quick burst (via animation-delay staggering the same keyframes per dot),
+   then sits still for the rest of a 4s cycle before looping. */
+@keyframes typing-dot {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  5% {
+    transform: translateY(-3px);
+  }
+  10%,
+  25% {
+    transform: translateY(0);
+  }
+  30% {
+    transform: translateY(-3px);
+  }
+  35%,
+  50% {
+    transform: translateY(0);
+  }
+  55% {
+    transform: translateY(-3px);
+  }
+  60% {
+    transform: translateY(0);
+  }
+}
+.typing-dot {
+  animation: typing-dot 4s ease-in-out infinite;
 }

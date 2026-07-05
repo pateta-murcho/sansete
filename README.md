@@ -1,4 +1,4 @@
-# Sonset
+# Sunset Tabas
 
 E-commerce com 3 perfis de usuário (admin, cliente, motoboy). Frontend em React (Vite),
 backend em Rust (Axum), microserviço de WhatsApp em Node (whatsapp-web.js).

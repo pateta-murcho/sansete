@@ -38,7 +38,7 @@ fn fake_copia_cola() -> String {
         })
         .collect();
     format!(
-        "00020126580014BR.GOV.BCB.PIX0136{chunk}5204000053039865802BR5913SONSET LOJA6009SAO PAULO62070503***6304ABCD"
+        "00020126580014BR.GOV.BCB.PIX0136{chunk}5204000053039865802BR5912SUNSET TABAS6009SAO PAULO62070503***6304ABCD"
     )
 }
 
@@ -76,9 +76,9 @@ pub async fn create_pix_payment(
             let idempotency_key = uuid::Uuid::new_v4().to_string();
             let body = json!({
                 "transaction_amount": total,
-                "description": "Pedido Sonset",
+                "description": "Pedido Sunset Tabas",
                 "payment_method_id": "pix",
-                "payer": { "email": format!("{whatsapp_digits}@sonset.cliente") }
+                "payer": { "email": format!("{whatsapp_digits}@sunsettabas.cliente") }
             });
             let resp = state
                 .http
