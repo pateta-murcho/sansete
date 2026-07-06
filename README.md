@@ -40,6 +40,13 @@ Postgres do Supabase (projeto `zncpcsdpdkvjfknmmhpu`), configurado via `DATABASE
 `cargo run` (via `sqlx::migrate!`), então subir o backend já deixa o schema em dia — não precisa
 rodar nada manual no SQL Editor do Supabase.
 
+**Multi-tenant no mesmo projeto Supabase:** esse projeto Supabase é compartilhado com outro app
+(VRTech), que usa o schema `public` com tabelas de nomes parecidos (`products`, `categories`,
+`orders`...). Pra não colidir, todo o backend do Sunset roda isolado dentro do schema
+**`sunset`** — o `main.rs` cria o schema automaticamente (`CREATE SCHEMA IF NOT EXISTS sunset`) e
+seta `search_path=sunset,public` em toda conexão do pool, então nenhuma query precisa ser
+qualificada manualmente. Nenhuma tabela do Sunset aparece em `public`, e vice-versa.
+
 Import: as credenciais de API do Supabase (anon/service_role) **não** servem pra conexão direta
 via `sqlx` — é preciso a senha do Postgres (Project Settings → Database → Connection string).
 

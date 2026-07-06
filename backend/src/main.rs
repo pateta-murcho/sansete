@@ -64,10 +64,29 @@ async fn main() -> anyhow::Result<()> {
     let pickup_address = std::env::var("STORE_PICKUP_ADDRESS")
         .unwrap_or_else(|_| "combine o endereço pelo WhatsApp da loja".to_string());
 
+    // This Supabase project is shared with other apps (e.g. VRTech), which use
+    // the default "public" schema with similarly-named tables (products,
+    // categories, orders...). To avoid colliding with those, everything this
+    // backend creates/reads lives in its own "sunset" schema instead —
+    // `after_connect` sets search_path on every pooled connection so every
+    // unqualified table name in our SQL resolves there, with no need to
+    // schema-qualify each query by hand.
     let connect_options = PgConnectOptions::from_str(&database_url)?;
     let pool = PgPoolOptions::new()
         .max_connections(5)
+        .after_connect(|conn, _meta| {
+            Box::pin(async move {
+                sqlx::query("SET search_path TO sunset, public")
+                    .execute(conn)
+                    .await?;
+                Ok(())
+            })
+        })
         .connect_with(connect_options)
+        .await?;
+
+    sqlx::query("CREATE SCHEMA IF NOT EXISTS sunset")
+        .execute(&pool)
         .await?;
 
     sqlx::migrate!("./migrations").run(&pool).await?;
