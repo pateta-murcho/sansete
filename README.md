@@ -66,11 +66,36 @@ Para usar o sandbox real do Mercado Pago: crie uma aplicação em
 https://www.mercadopago.com.br/developers/panel, pegue o **Access Token de teste** (`TEST-...`)
 em "Credenciais de teste" e cole em `backend/.env` na variável `MP_ACCESS_TOKEN`.
 
-## WhatsApp
+## WhatsApp (Evolution API)
 
-O gateway sobe mesmo sem conexão (mensagens só ficam logadas no console). Para conectar de
-verdade: rode `whatsapp-gateway`, acesse `GET http://localhost:3001/qr` (ou veja o QR ASCII no
-terminal) e escaneie pelo WhatsApp do celular em Aparelhos conectados → Conectar um aparelho.
+O backend manda mensagens via uma instância própria da [Evolution
+API](https://github.com/EvolutionAPI/evolution-api) (self-hosted, deploy via template do
+Railway — inclui Postgres e Redis próprios, dá pra rodar no mesmo projeto do backend). O antigo
+microserviço `whatsapp-gateway/` (Node + whatsapp-web.js) não é mais usado.
+
+Variáveis de ambiente do backend:
+
+- `EVOLUTION_API_URL` — domínio público gerado pro serviço `evolution-api` no Railway (com
+  `https://`, sem barra no final).
+- `EVOLUTION_API_KEY` — valor de `AUTHENTICATION_API_KEY` nas Variables do serviço
+  `evolution-api` (é gerado automaticamente pelo template).
+- `EVOLUTION_INSTANCE` — nome da instância do WhatsApp criada no painel da Evolution API.
+
+Se qualquer uma dessas três faltar, o backend não quebra: só loga a mensagem no console em vez
+de enviar (`[whatsapp not configured] ...`).
+
+Se o backend e a Evolution API estiverem no **mesmo projeto Railway** (é o caso aqui), pode
+referenciar as variáveis do outro serviço direto, sem copiar valores manualmente:
+
+```
+EVOLUTION_API_URL=https://${{evolution-api.RAILWAY_PUBLIC_DOMAIN}}
+EVOLUTION_API_KEY=${{evolution-api.AUTHENTICATION_API_KEY}}
+EVOLUTION_INSTANCE=sunset
+```
+
+Para conectar o número de verdade: acesse `https://<domínio-da-evolution-api>/manager`, entre
+com a API key, crie uma instância (nome = valor de `EVOLUTION_INSTANCE`) e escaneie o QR pelo
+WhatsApp do celular em Aparelhos conectados → Conectar um aparelho.
 
 ## Rotas
 

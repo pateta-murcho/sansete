@@ -3,32 +3,49 @@ use std::time::Duration;
 
 use crate::state::AppState;
 
-/// Fire-and-forget WhatsApp notification. Never blocks or fails the caller:
-/// spawns a background task and logs+ignores any error.
+/// Fire-and-forget WhatsApp notification via a self-hosted Evolution API
+/// instance (https://github.com/EvolutionAPI/evolution-api). Never blocks or
+/// fails the caller: spawns a background task and logs+ignores any error. If
+/// Evolution API isn't configured yet, just logs the message instead.
 pub fn notify(state: &AppState, phone: &str, message: &str) {
+    if state.evolution_api_url.is_empty()
+        || state.evolution_api_key.is_empty()
+        || state.evolution_instance.is_empty()
+    {
+        tracing::info!("[whatsapp not configured] to {}: {}", phone, message);
+        return;
+    }
+
     let http = state.http.clone();
-    let url = format!("{}/send", state.whatsapp_url);
+    let url = format!(
+        "{}/message/sendText/{}",
+        state.evolution_api_url.trim_end_matches('/'),
+        state.evolution_instance
+    );
+    let api_key = (*state.evolution_api_key).clone();
     let phone = phone.to_string();
     let message = message.to_string();
 
     tokio::spawn(async move {
         let result = http
             .post(&url)
-            .timeout(Duration::from_secs(5))
-            .json(&json!({ "phone": phone, "message": message }))
+            .timeout(Duration::from_secs(10))
+            .header("apikey", api_key)
+            .json(&json!({ "number": phone, "text": message }))
             .send()
             .await;
 
         match result {
             Ok(resp) if !resp.status().is_success() => {
+                let status = resp.status();
+                let body = resp.text().await.unwrap_or_default();
                 tracing::warn!(
-                    "whatsapp gateway returned non-success status {} for phone {}",
-                    resp.status(),
-                    phone
+                    "evolution api returned non-success status {} for phone {}: {}",
+                    status, phone, body
                 );
             }
             Err(e) => {
-                tracing::warn!("failed to reach whatsapp gateway for phone {}: {}", phone, e);
+                tracing::warn!("failed to reach evolution api for phone {}: {}", phone, e);
             }
             _ => {}
         }

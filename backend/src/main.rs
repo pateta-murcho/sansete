@@ -48,8 +48,14 @@ async fn main() -> anyhow::Result<()> {
         }
     };
 
-    let whatsapp_url = std::env::var("WHATSAPP_GATEWAY_URL")
-        .unwrap_or_else(|_| "http://localhost:3001".to_string());
+    let evolution_api_url = std::env::var("EVOLUTION_API_URL").unwrap_or_default();
+    let evolution_api_key = std::env::var("EVOLUTION_API_KEY").unwrap_or_default();
+    let evolution_instance = std::env::var("EVOLUTION_INSTANCE").unwrap_or_default();
+    if evolution_api_url.is_empty() || evolution_api_key.is_empty() || evolution_instance.is_empty() {
+        tracing::warn!(
+            "EVOLUTION_API_URL/EVOLUTION_API_KEY/EVOLUTION_INSTANCE not fully set — WhatsApp messages will only be logged, not sent"
+        );
+    }
 
     let mp_token = std::env::var("MP_ACCESS_TOKEN")
         .ok()
@@ -100,7 +106,9 @@ async fn main() -> anyhow::Result<()> {
         pool,
         jwt_secret: Arc::new(jwt_secret),
         http,
-        whatsapp_url: Arc::new(whatsapp_url),
+        evolution_api_url: Arc::new(evolution_api_url),
+        evolution_api_key: Arc::new(evolution_api_key),
+        evolution_instance: Arc::new(evolution_instance),
         mp_token: Arc::new(mp_token),
         pickup_address: Arc::new(pickup_address),
     };
