@@ -334,7 +334,7 @@ pub async fn refresh_payment(
             "Recebemos seu pagamento! Seu pedido #{} já está sendo preparado. 🌇",
             short_id(&order.id)
         );
-        whatsapp::notify(&state, &digits, &msg);
+        whatsapp::notify(&state, &state.evolution_instance, &digits, &msg);
     }
 
     let dto = fetch_order_dto(&state.pool, &id)
@@ -371,7 +371,7 @@ pub async fn simulate_pix_paid(
             "Recebemos seu pagamento! Seu pedido #{} já está sendo preparado. 🌇",
             short_id(&order.id)
         );
-        whatsapp::notify(&state, &digits, &msg);
+        whatsapp::notify(&state, &state.evolution_instance, &digits, &msg);
     }
 
     let dto = fetch_order_dto(&state.pool, &id)

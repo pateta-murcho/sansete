@@ -53,6 +53,8 @@ export interface Order {
   pix_payment_id?: string | null
   pix_qr_base64?: string | null
   pix_copia_cola?: string | null
+  customer_lat?: number | null
+  customer_lng?: number | null
   items: OrderItem[]
   created_at: string
   updated_at?: string

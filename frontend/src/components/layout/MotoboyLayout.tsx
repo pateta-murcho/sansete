@@ -5,8 +5,8 @@ import { useMotoboyAuth } from '../../store/motoboyAuth'
 
 const NAV_ITEMS = [
   { href: '/motoboy', label: 'Fila', icon: Truck },
-  { href: '/motoboy/financeiro', label: 'Financeiro', icon: Wallet },
   { href: '/motoboy/conta', label: 'Conta', icon: MessageCircle },
+  { href: '/motoboy/financeiro', label: 'Financeiro', icon: Wallet },
 ]
 
 export default function MotoboyLayout() {

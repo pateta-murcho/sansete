@@ -227,6 +227,15 @@ const remoteApi = {
       status: () => request<EvolutionStatus>('/api/motoboy/whatsapp/status', { token: motoboyToken() }),
       connect: () => request<EvolutionConnect>('/api/motoboy/whatsapp/connect', { token: motoboyToken() }),
       logout: () => request<void>('/api/motoboy/whatsapp/logout', { method: 'POST', token: motoboyToken() }),
+      // Chamado depois do RPC motoboy_request_location (que só mexe no
+      // banco) — manda a mensagem de verdade a partir do WhatsApp do
+      // próprio motoboy.
+      notifyLocationRequest: (orders: { phone: string; customer_name: string }[]) =>
+        request<void>('/api/motoboy/whatsapp/notify-location-request', {
+          method: 'POST',
+          body: JSON.stringify({ orders }),
+          token: motoboyToken(),
+        }),
     },
   },
 }

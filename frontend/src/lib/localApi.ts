@@ -653,6 +653,7 @@ export const localApi = {
         throw new ApiError(400, 'WhatsApp não disponível no modo demonstração.')
       },
       logout: async () => {},
+      notifyLocationRequest: async () => {},
     },
   },
 }

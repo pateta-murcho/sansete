@@ -11,4 +11,8 @@ pub struct AppState {
     pub evolution_instance: Arc<String>,
     pub mp_token: Arc<Option<String>>,
     pub pickup_address: Arc<String>,
+    /// This backend's own public URL (e.g. Railway domain), registered as
+    /// the Evolution API webhook target so incoming WhatsApp messages
+    /// (location shares) reach `/api/webhooks/evolution`.
+    pub backend_public_url: Arc<String>,
 }

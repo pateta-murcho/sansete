@@ -120,7 +120,7 @@ pub async fn request_location(
             "Olá {}! Para agilizar sua entrega, envie sua localização atual aqui no WhatsApp 📍",
             order.customer_name
         );
-        whatsapp::notify(&state, &digits, &msg);
+        whatsapp::notify(&state, &state.evolution_instance, &digits, &msg);
 
         let dto = fetch_order_dto(&state.pool, &order_id)
             .await?
@@ -173,6 +173,7 @@ pub async fn update_order_status(
         let digits = whatsapp::digits_only(&order.customer_whatsapp);
         whatsapp::notify(
             &state,
+            &state.evolution_instance,
             &digits,
             "Seu pedido acabou de sair para entrega! Aguarde no local informado 🛵",
         );
@@ -217,5 +218,36 @@ pub async fn whatsapp_logout(
 ) -> Result<StatusCode, AppError> {
     let instance = motoboy_instance_name(&motoboy_id);
     whatsapp::logout(&state, &instance).await?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
+// ---------- Location-request notification (sent from the motoboy's own
+// instance, after sunset.motoboy_request_location already updated the DB) ----------
+
+#[derive(Debug, Deserialize)]
+pub struct NotifyLocationOrder {
+    pub phone: String,
+    pub customer_name: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct NotifyLocationRequestInput {
+    pub orders: Vec<NotifyLocationOrder>,
+}
+
+pub async fn notify_location_request(
+    State(state): State<AppState>,
+    SunsetMotoboySession(motoboy_id): SunsetMotoboySession,
+    Json(input): Json<NotifyLocationRequestInput>,
+) -> Result<StatusCode, AppError> {
+    let instance = motoboy_instance_name(&motoboy_id);
+    for order in input.orders {
+        let digits = whatsapp::digits_only(&order.phone);
+        let msg = format!(
+            "Olá {}! Para agilizar sua entrega, envie sua localização atual aqui no WhatsApp 📍",
+            order.customer_name
+        );
+        whatsapp::notify(&state, &instance, &digits, &msg);
+    }
     Ok(StatusCode::NO_CONTENT)
 }

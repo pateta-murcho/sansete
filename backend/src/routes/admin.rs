@@ -393,7 +393,7 @@ pub async fn update_order_status(
             "Seu pedido está pronto! Pode vir buscar 😊 Local de retirada: {}",
             state.pickup_address
         );
-        whatsapp::notify(&state, &digits, &msg);
+        whatsapp::notify(&state, &state.evolution_instance, &digits, &msg);
     }
 
     let dto = crate::orders_common::fetch_order_dto(&state.pool, &id)

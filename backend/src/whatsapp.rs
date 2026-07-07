@@ -4,23 +4,20 @@ use std::time::Duration;
 use crate::state::AppState;
 
 /// Fire-and-forget WhatsApp notification via a self-hosted Evolution API
-/// instance (https://github.com/EvolutionAPI/evolution-api). Never blocks or
-/// fails the caller: spawns a background task and logs+ignores any error. If
-/// Evolution API isn't configured yet, just logs the message instead.
-pub fn notify(state: &AppState, phone: &str, message: &str) {
-    if state.evolution_api_url.is_empty()
-        || state.evolution_api_key.is_empty()
-        || state.evolution_instance.is_empty()
-    {
+/// instance (https://github.com/EvolutionAPI/evolution-api), sent from the
+/// given instance (the store's own, or a specific motoboy's). Never blocks
+/// or fails the caller: spawns a background task and logs+ignores any
+/// error. If Evolution API isn't configured yet, just logs the message.
+pub fn notify(state: &AppState, instance: &str, phone: &str, message: &str) {
+    if state.evolution_api_url.is_empty() || state.evolution_api_key.is_empty() || instance.is_empty() {
         tracing::info!("[whatsapp not configured] to {}: {}", phone, message);
         return;
     }
 
     let http = state.http.clone();
     let url = format!(
-        "{}/message/sendText/{}",
+        "{}/message/sendText/{instance}",
         state.evolution_api_url.trim_end_matches('/'),
-        state.evolution_instance
     );
     let api_key = (*state.evolution_api_key).clone();
     let phone = phone.to_string();
@@ -125,6 +122,15 @@ pub async fn connect(state: &AppState, instance: &str) -> Result<serde_json::Val
         tracing::warn!("evolution api instance/create failed (may already exist): {e}");
     }
 
+    // Best-effort: point this instance's webhook at us so incoming messages
+    // (customer sharing their location) reach /api/webhooks/evolution. Not
+    // fatal if it fails — connecting still works, just without that feature.
+    if !state.backend_public_url.is_empty() {
+        if let Err(e) = set_webhook(state, instance).await {
+            tracing::warn!("failed to configure webhook for instance {instance}: {e:?}");
+        }
+    }
+
     let resp = state
         .http
         .get(format!("{base}/instance/connect/{instance}"))
@@ -134,6 +140,35 @@ pub async fn connect(state: &AppState, instance: &str) -> Result<serde_json::Val
         .await
         .map_err(|e| crate::error::AppError::Internal(format!("evolution api unreachable: {e}")))?;
     evolution_json(resp).await
+}
+
+/// Points the given instance's webhook at this backend's own
+/// `/api/webhooks/evolution`, subscribed to MESSAGES_UPSERT (incoming
+/// messages) — so admin/motoboy never need to touch the Evolution API
+/// Manager by hand.
+async fn set_webhook(state: &AppState, instance: &str) -> Result<(), crate::error::AppError> {
+    let base = state.evolution_api_url.trim_end_matches('/');
+    let webhook_url = format!(
+        "{}/api/webhooks/evolution",
+        state.backend_public_url.trim_end_matches('/')
+    );
+    let resp = state
+        .http
+        .post(format!("{base}/webhook/set/{instance}"))
+        .timeout(Duration::from_secs(15))
+        .header("apikey", state.evolution_api_key.as_str())
+        .json(&json!({
+            "webhook": {
+                "enabled": true,
+                "url": webhook_url,
+                "webhookByEvents": false,
+                "events": ["MESSAGES_UPSERT"]
+            }
+        }))
+        .send()
+        .await
+        .map_err(|e| crate::error::AppError::Internal(format!("evolution api unreachable: {e}")))?;
+    evolution_json(resp).await.map(|_| ())
 }
 
 /// Logs out the WhatsApp session for the given instance (keeps it registered

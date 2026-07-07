@@ -70,6 +70,17 @@ async fn main() -> anyhow::Result<()> {
     let pickup_address = std::env::var("STORE_PICKUP_ADDRESS")
         .unwrap_or_else(|_| "combine o endereço pelo WhatsApp da loja".to_string());
 
+    // Registered as the Evolution API webhook target (see whatsapp::set_webhook)
+    // so incoming location messages reach /api/webhooks/evolution. Without it,
+    // instances still connect/send fine — only the "receive customer location"
+    // feature is disabled.
+    let backend_public_url = std::env::var("BACKEND_PUBLIC_URL").unwrap_or_default();
+    if backend_public_url.is_empty() {
+        tracing::warn!(
+            "BACKEND_PUBLIC_URL not set — Evolution API webhooks won't be configured, so incoming WhatsApp location messages won't be captured"
+        );
+    }
+
     // This Supabase project is shared with other apps (e.g. VRTech), which use
     // the default "public" schema with similarly-named tables (products,
     // categories, orders...). To avoid colliding with those, everything this
@@ -111,6 +122,7 @@ async fn main() -> anyhow::Result<()> {
         evolution_instance: Arc::new(evolution_instance),
         mp_token: Arc::new(mp_token),
         pickup_address: Arc::new(pickup_address),
+        backend_public_url: Arc::new(backend_public_url),
     };
 
     // CORS_ORIGINS: comma-separated list of allowed frontend origins. Defaults
@@ -210,6 +222,13 @@ async fn main() -> anyhow::Result<()> {
         .route("/api/motoboy/whatsapp/status", get(routes::motoboy::whatsapp_status))
         .route("/api/motoboy/whatsapp/connect", get(routes::motoboy::whatsapp_connect))
         .route("/api/motoboy/whatsapp/logout", post(routes::motoboy::whatsapp_logout))
+        .route(
+            "/api/motoboy/whatsapp/notify-location-request",
+            post(routes::motoboy::notify_location_request),
+        )
+        // Público de propósito: é a Evolution API chamando, não um usuário
+        // logado. Fica fora do CORS layer não importar (não é um browser).
+        .route("/api/webhooks/evolution", post(routes::webhooks::evolution_webhook))
         .layer(cors)
         .layer(TraceLayer::new_for_http())
         .with_state(state);

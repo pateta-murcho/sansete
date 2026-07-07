@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Reorder } from 'framer-motion'
-import { GripVertical, Loader2, MapPin, Navigation, Package, PackageCheck } from 'lucide-react'
+import { GripVertical, Loader2, MapPin, MapPinned, Navigation, Package, PackageCheck } from 'lucide-react'
 import { StatusBadge } from '../../components/ui/Badge'
 import WhatsAppLink from '../../components/ui/WhatsAppLink'
 import { api, ApiError } from '../../lib/api'
@@ -49,6 +49,16 @@ export default function MotoboyFila() {
 
   useEffect(load, [tab])
 
+  // Enquanto espera o cliente responder com a localização, verifica de
+  // tempos em tempos — a atualização chega via webhook, assíncrona.
+  useEffect(() => {
+    if (tab !== 'aguardando_localizacao') return
+    const interval = setInterval(() => {
+      api.motoboy.orders.list(tab).then(setOrders)
+    }, 15000)
+    return () => clearInterval(interval)
+  }, [tab])
+
   const toggleSelect = (id: string) => {
     setSelected((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))
   }
@@ -57,7 +67,17 @@ export default function MotoboyFila() {
     if (selected.length === 0) return
     setRequesting(true)
     try {
-      await api.motoboy.orders.requestLocation(selected)
+      const result = await api.motoboy.orders.requestLocation(selected)
+      // O RPC só mexe no banco (marca aguardando_localizacao) — quem manda
+      // a mensagem de verdade, a partir do WhatsApp do próprio motoboy, é
+      // essa segunda chamada (backend Rust, guarda a chave da Evolution API).
+      if (result.updated.length > 0) {
+        await api.motoboy.whatsapp
+          .notifyLocationRequest(
+            result.updated.map((o) => ({ phone: o.customer_whatsapp, customer_name: o.customer_name }))
+          )
+          .catch(() => {})
+      }
       load()
     } finally {
       setRequesting(false)
@@ -176,6 +196,18 @@ export default function MotoboyFila() {
                     {order.neighborhood}
                     {order.address ? ` · ${order.address}` : ''}
                   </p>
+                  {order.customer_lat != null && order.customer_lng != null && (
+                    <a
+                      href={`https://www.google.com/maps?q=${order.customer_lat},${order.customer_lng}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={(e) => e.stopPropagation()}
+                      className="inline-flex items-center gap-1.5 mt-1.5 text-xs font-semibold text-green-500 hover:underline"
+                    >
+                      <MapPinned className="w-3.5 h-3.5" />
+                      Localização recebida — abrir no mapa
+                    </a>
+                  )}
                   <div className="flex items-center justify-between text-sm mt-2">
                     <span className="text-son-silver-dim">{order.payment_method}</span>
                     <span className="sunset-text font-bold">{currency(order.total)}</span>
