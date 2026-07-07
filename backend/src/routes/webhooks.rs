@@ -23,8 +23,8 @@ pub async fn evolution_webhook(State(state): State<AppState>, Json(payload): Jso
 async fn handle(state: &AppState, payload: &Value) -> anyhow::Result<()> {
     tracing::info!(
         "evolution webhook: event={} instance={}",
-        payload.get("event").and_then(Value::as_str).unwrap_or("?"),
-        payload.get("instance").and_then(Value::as_str).unwrap_or("?"),
+        payload.get("event").and_then(|v| v.as_str()).unwrap_or("?"),
+        payload.get("instance").and_then(|v| v.as_str()).unwrap_or("?"),
     );
     // TEMP: dumping the full payload while we pin down the exact shape this
     // Evolution API version sends — remove once location capture is confirmed
@@ -51,8 +51,8 @@ async fn handle(state: &AppState, payload: &Value) -> anyhow::Result<()> {
         return Ok(());
     };
     let (Some(lat), Some(lng)) = (
-        location.get("degreesLatitude").and_then(Value::as_f64),
-        location.get("degreesLongitude").and_then(Value::as_f64),
+        location.get("degreesLatitude").and_then(|v| v.as_f64()),
+        location.get("degreesLongitude").and_then(|v| v.as_f64()),
     ) else {
         return Ok(());
     };
@@ -61,7 +61,7 @@ async fn handle(state: &AppState, payload: &Value) -> anyhow::Result<()> {
     let remote_jid = data
         .get("key")
         .and_then(|k| k.get("remoteJid"))
-        .and_then(Value::as_str)
+        .and_then(|v| v.as_str())
         .unwrap_or("");
     let phone_digits: String = remote_jid.chars().take_while(char::is_ascii_digit).collect();
     if phone_digits.is_empty() {
