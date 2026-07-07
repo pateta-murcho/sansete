@@ -8,7 +8,7 @@ import { useAdminAuth } from '../../store/adminAuth'
 export default function AdminLogin() {
   const { token, login } = useAdminAuth()
   const navigate = useNavigate()
-  const [email, setEmail] = useState('pablo@gmail.com')
+  const [email, setEmail] = useState('pablo2@gmail.com')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)

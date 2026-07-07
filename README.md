@@ -52,7 +52,7 @@ via `sqlx` — é preciso a senha do Postgres (Project Settings → Database →
 
 ## Credenciais de teste (seed automático)
 
-- Admin: `pablo@gmail.com` / `123456` → `/admin/login` (e-mail/senha trocáveis em `/admin/conta` depois de logar)
+- Admin: `pablo2@gmail.com` / `123456` → `/admin/login` (e-mail/senha trocáveis em `/admin/conta` depois de logar)
 - Motoboy: `motoboy@sonset.com` / `motoboy123` → `/motoboy/login`
 - Cliente: não precisa de login, só WhatsApp na hora do checkout.
 

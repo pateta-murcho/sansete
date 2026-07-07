@@ -40,12 +40,22 @@ ALTER TABLE sunset.sessions ENABLE ROW LEVEL SECURITY;
 -- tabela só é lida/escrita pelas funções SECURITY DEFINER abaixo,
 -- nunca diretamente pela API REST.
 
+-- Remove duplicatas (ex.: sobras de execuções anteriores desse script),
+-- mantendo só a linha mais antiga entre os e-mails de teste conhecidos —
+-- evita "duplicate key" no UPDATE logo abaixo, não importa quantas vezes
+-- esse arquivo já foi rodado antes.
+DELETE FROM sunset.admins a
+  USING sunset.admins b
+  WHERE a.email IN ('admin@sonset.com', 'sunset@gmail.com', 'pablo2@gmail.com')
+    AND b.email IN ('admin@sonset.com', 'sunset@gmail.com', 'pablo2@gmail.com')
+    AND a.created_at > b.created_at;
+
 -- Re-hash das credenciais seedadas pelo backend Rust em argon2 (que o
 -- Postgres não verifica nativamente) pra bcrypt via pgcrypto, e troca o
 -- admin de teste pro e-mail/senha reais. WHERE cobre os e-mails antigos e o
 -- novo pra esse UPDATE poder ser re-executado sem erro.
-UPDATE sunset.admins SET email = 'pablo@gmail.com', password_hash = crypt('123456', gen_salt('bf'))
-  WHERE email IN ('admin@sonset.com', 'sunset@gmail.com', 'pablo@gmail.com');
+UPDATE sunset.admins SET email = 'pablo2@gmail.com', password_hash = crypt('123456', gen_salt('bf'))
+  WHERE email IN ('admin@sonset.com', 'sunset@gmail.com', 'pablo2@gmail.com');
 UPDATE sunset.motoboys SET password_hash = crypt('motoboy123', gen_salt('bf'))
   WHERE email = 'motoboy@sonset.com';
 
