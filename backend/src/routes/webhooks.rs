@@ -21,9 +21,22 @@ pub async fn evolution_webhook(State(state): State<AppState>, Json(payload): Jso
 }
 
 async fn handle(state: &AppState, payload: &Value) -> anyhow::Result<()> {
-    let data = payload.get("data").unwrap_or(&Value::Null);
+    tracing::info!(
+        "evolution webhook: event={} instance={}",
+        payload.get("event").and_then(Value::as_str).unwrap_or("?"),
+        payload.get("instance").and_then(Value::as_str).unwrap_or("?"),
+    );
 
-    let Some(location) = data.get("message").and_then(|m| m.get("locationMessage")) else {
+    let data = payload.get("data").unwrap_or(&Value::Null);
+    let message = data.get("message").unwrap_or(&Value::Null);
+
+    // WhatsApp has two distinct share types: a fixed pin ("locationMessage")
+    // and a live/moving share ("liveLocationMessage") — both carry the same
+    // lat/lng field names, so either is handled the same way here.
+    let location = message
+        .get("locationMessage")
+        .or_else(|| message.get("liveLocationMessage"));
+    let Some(location) = location else {
         return Ok(());
     };
     let (Some(lat), Some(lng)) = (
@@ -44,12 +57,12 @@ async fn handle(state: &AppState, payload: &Value) -> anyhow::Result<()> {
         return Ok(());
     }
 
+    // No way to tell which specific order a raw WhatsApp message is "for"
+    // when the same customer has more than one order awaiting a location at
+    // once — so this updates all of them rather than guessing by recency.
     let result = sqlx::query(
-        "UPDATE orders SET customer_lat = $1, customer_lng = $2 WHERE id = ( \
-           SELECT id FROM orders \
-           WHERE customer_whatsapp = $3 AND status = 'aguardando_localizacao' \
-           ORDER BY created_at DESC LIMIT 1 \
-         )",
+        "UPDATE orders SET customer_lat = $1, customer_lng = $2 \
+         WHERE customer_whatsapp = $3 AND status = 'aguardando_localizacao'",
     )
     .bind(lat)
     .bind(lng)
@@ -58,7 +71,10 @@ async fn handle(state: &AppState, payload: &Value) -> anyhow::Result<()> {
     .await?;
 
     if result.rows_affected() > 0 {
-        tracing::info!("captured customer location for phone {phone_digits}");
+        tracing::info!(
+            "captured customer location for phone {phone_digits} ({} order(s))",
+            result.rows_affected()
+        );
     } else {
         tracing::info!("got a location from {phone_digits} but no order is awaiting one from them");
     }
