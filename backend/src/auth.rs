@@ -98,6 +98,44 @@ impl FromRequestParts<AppState> for AdminUser {
     }
 }
 
+/// Extractor: requires a valid Bearer token matching an admin row in
+/// sunset.sessions — the Postgres-native session system the Supabase-facing
+/// frontend uses now (NOT the JWT system above). Used only by routes that
+/// still need Rust because they touch a secret (Evolution API key), while
+/// the rest of admin auth/CRUD lives in Supabase RPCs.
+pub struct SunsetAdminSession(#[allow(dead_code)] pub String);
+
+impl FromRequestParts<AppState> for SunsetAdminSession {
+    type Rejection = AppError;
+
+    async fn from_request_parts(
+        parts: &mut Parts,
+        state: &AppState,
+    ) -> Result<Self, Self::Rejection> {
+        let header = parts
+            .headers
+            .get(axum::http::header::AUTHORIZATION)
+            .and_then(|v| v.to_str().ok())
+            .ok_or_else(|| AppError::Unauthorized("missing authorization header".to_string()))?;
+        let token = header
+            .strip_prefix("Bearer ")
+            .ok_or_else(|| AppError::Unauthorized("invalid authorization header".to_string()))?;
+
+        let subject: Option<(String,)> = sqlx::query_as(
+            "SELECT subject_id FROM sessions WHERE token = $1 AND role = 'admin' AND expires_at > now()",
+        )
+        .bind(token)
+        .fetch_optional(&state.pool)
+        .await
+        .map_err(|e| AppError::Internal(e.to_string()))?;
+
+        match subject {
+            Some((id,)) => Ok(SunsetAdminSession(id)),
+            None => Err(AppError::Unauthorized("invalid or expired session".to_string())),
+        }
+    }
+}
+
 /// Extractor: requires a valid JWT with role == motoboy.
 pub struct MotoboyUser(pub Claims);
 

@@ -186,6 +186,9 @@ async fn main() -> anyhow::Result<()> {
             patch(routes::admin::update_order_status),
         )
         .route("/api/admin/financeiro", get(routes::admin::financeiro))
+        .route("/api/admin/whatsapp/status", get(routes::admin::whatsapp_status))
+        .route("/api/admin/whatsapp/connect", get(routes::admin::whatsapp_connect))
+        .route("/api/admin/whatsapp/logout", post(routes::admin::whatsapp_logout))
         .route(
             "/api/admin/shipping-rates",
             get(routes::admin::list_shipping_rates),

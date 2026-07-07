@@ -3,6 +3,7 @@ import { Reorder } from 'framer-motion'
 import { GripVertical, Loader2, Package } from 'lucide-react'
 import { StatusBadge } from '../../components/ui/Badge'
 import Card from '../../components/ui/Card'
+import WhatsAppLink from '../../components/ui/WhatsAppLink'
 import { api, ApiError } from '../../lib/api'
 import type { Order } from '../../lib/types'
 
@@ -147,7 +148,12 @@ export default function AdminPedidos() {
                     <StatusBadge status={order.status} />
                   </div>
                   <p className="font-semibold text-white">{order.customer_name}</p>
-                  <p className="text-xs text-son-silver-dim mb-2">{order.customer_whatsapp}</p>
+                  <p className="mb-2">
+                    <WhatsAppLink
+                      phone={order.customer_whatsapp}
+                      className="text-xs text-son-silver-dim hover:text-son-pink hover:underline inline-flex items-center gap-1"
+                    />
+                  </p>
                   <ul className="text-sm text-son-silver space-y-0.5 mb-2">
                     {order.items.map((item) => (
                       <li key={item.product_id}>

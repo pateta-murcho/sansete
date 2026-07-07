@@ -4,7 +4,7 @@ use axum::Json;
 use serde::Deserialize;
 use uuid::Uuid;
 
-use crate::auth::{hash_password, AdminUser};
+use crate::auth::{hash_password, AdminUser, SunsetAdminSession};
 use crate::error::AppError;
 use crate::models::{
     Category, CategoryInput, FinanceiroSummary, MotoboyDto, MotoboyInput, MotoboyRow, OrderDto,
@@ -495,4 +495,33 @@ pub async fn financeiro(
         top_products,
         recent_orders,
     }))
+}
+
+// ---------- WhatsApp (Evolution API) ----------
+//
+// Admin auth here uses SunsetAdminSession (checks sunset.sessions directly),
+// not the JWT AdminUser above — the frontend's admin login moved to a
+// Supabase RPC session, but these 3 routes still need to live in Rust
+// because they touch the Evolution API key, which must stay off the browser.
+
+pub async fn whatsapp_status(
+    State(state): State<AppState>,
+    _admin: SunsetAdminSession,
+) -> Result<Json<serde_json::Value>, AppError> {
+    Ok(Json(whatsapp::connection_status(&state).await?))
+}
+
+pub async fn whatsapp_connect(
+    State(state): State<AppState>,
+    _admin: SunsetAdminSession,
+) -> Result<Json<serde_json::Value>, AppError> {
+    Ok(Json(whatsapp::connect(&state).await?))
+}
+
+pub async fn whatsapp_logout(
+    State(state): State<AppState>,
+    _admin: SunsetAdminSession,
+) -> Result<StatusCode, AppError> {
+    whatsapp::logout(&state).await?;
+    Ok(StatusCode::NO_CONTENT)
 }

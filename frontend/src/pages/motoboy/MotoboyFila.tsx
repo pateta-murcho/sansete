@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Reorder } from 'framer-motion'
 import { GripVertical, Loader2, MapPin, Navigation, Package, PackageCheck } from 'lucide-react'
 import { StatusBadge } from '../../components/ui/Badge'
+import WhatsAppLink from '../../components/ui/WhatsAppLink'
 import { api, ApiError } from '../../lib/api'
 import type { Order, OrderStatus } from '../../lib/types'
 
@@ -167,7 +168,9 @@ export default function MotoboyFila() {
                     <span className="font-semibold text-white truncate">{order.customer_name}</span>
                     <StatusBadge status={order.status} />
                   </div>
-                  <p className="text-xs text-son-silver-dim">{order.customer_whatsapp}</p>
+                  <p className="text-xs text-son-silver-dim">
+                    <WhatsAppLink phone={order.customer_whatsapp} className="hover:text-son-pink hover:underline inline-flex items-center gap-1" />
+                  </p>
                   <p className="text-sm text-son-silver mt-1">
                     <MapPin className="w-3.5 h-3.5 inline mr-1 -mt-0.5" />
                     {order.neighborhood}

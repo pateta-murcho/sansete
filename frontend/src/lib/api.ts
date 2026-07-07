@@ -4,7 +4,16 @@ import { ApiError } from './apiError'
 import { localApi } from './localApi'
 import { supabasePublicApi } from './supabasePublicApi'
 import { supabase } from './supabaseClient'
-import type { Category, FinanceiroSummary, Motoboy, Order, Product, ShippingRate } from './types'
+import type {
+  Category,
+  EvolutionConnect,
+  EvolutionStatus,
+  FinanceiroSummary,
+  Motoboy,
+  Order,
+  Product,
+  ShippingRate,
+} from './types'
 
 // Ainda usado só pro login admin/motoboy e Pix, que continuam no backend
 // Rust (Railway) até a migração de auth/Pix pra Supabase Auth/Edge Functions.
@@ -178,6 +187,14 @@ const remoteApi = {
     },
     financeiro: {
       get: () => rpc<FinanceiroSummary>('admin_financeiro', { p_token: adminToken() }),
+    },
+    // Único pedaço do admin que ainda fala com o backend Rust (Railway) em
+    // vez do Supabase — a chave da Evolution API precisa ficar fora do
+    // navegador.
+    whatsapp: {
+      status: () => request<EvolutionStatus>('/api/admin/whatsapp/status', { token: adminToken() }),
+      connect: () => request<EvolutionConnect>('/api/admin/whatsapp/connect', { token: adminToken() }),
+      logout: () => request<void>('/api/admin/whatsapp/logout', { method: 'POST', token: adminToken() }),
     },
   },
   motoboy: {

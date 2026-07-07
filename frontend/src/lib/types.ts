@@ -82,6 +82,23 @@ export interface ShippingRate {
   price: number
 }
 
+// Formato exato varia entre versões da Evolution API — os campos abaixo
+// cobrem as variações mais comuns; o componente que consome isso tenta
+// vários caminhos possíveis em vez de confiar em um só.
+export interface EvolutionStatus {
+  instance?: { instanceName?: string; state?: string }
+  state?: string
+  [key: string]: unknown
+}
+
+export interface EvolutionConnect {
+  base64?: string
+  code?: string
+  pairingCode?: string
+  qrcode?: { base64?: string; code?: string; pairingCode?: string }
+  [key: string]: unknown
+}
+
 export interface StatusCount {
   status: OrderStatus
   count: number

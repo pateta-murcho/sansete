@@ -587,6 +587,13 @@ export const localApi = {
     orders: { list: adminListOrders, updateStatus: adminUpdateStatus },
     shippingRates: { list: adminListShippingRates, update: adminUpdateShippingRate },
     financeiro: { get: financeiro },
+    whatsapp: {
+      status: async () => ({ instance: { state: 'close' } }),
+      connect: async () => {
+        throw new ApiError(400, 'WhatsApp não disponível no modo demonstração.')
+      },
+      logout: async () => {},
+    },
   },
   motoboy: {
     orders: { list: motoboyListOrders, requestLocation, updateStatus: motoboyUpdateStatus },
