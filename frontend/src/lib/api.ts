@@ -2,19 +2,20 @@ import { useAdminAuth } from '../store/adminAuth'
 import { useMotoboyAuth } from '../store/motoboyAuth'
 import { ApiError } from './apiError'
 import { localApi } from './localApi'
+import { supabasePublicApi } from './supabasePublicApi'
 import type { Category, FinanceiroSummary, Motoboy, Order, Product, ShippingRate } from './types'
 
-// Set VITE_API_BASE_URL in the Vercel project's environment variables once
-// the backend is deployed (Railway). Falls back to local dev.
+// Ainda usado só pro login admin/motoboy e Pix, que continuam no backend
+// Rust (Railway) até a migração de auth/Pix pra Supabase Auth/Edge Functions.
 export const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080'
 
-// No backend configured in production (e.g. deployed on Vercel alone, before
-// Railway is set up) -> fall back to a localStorage-backed mock so the site
-// can still be demoed end-to-end. Force it on with VITE_USE_LOCAL_DB=true;
-// local dev keeps hitting the real backend at localhost:8080 by default.
+// Catálogo/checkout/consulta falam direto com o Supabase (ver
+// supabasePublicApi.ts) — sem isso configurado, cai em modo demonstração
+// (localStorage) pra não quebrar a build. Force com VITE_USE_LOCAL_DB=true;
+// local dev continua batendo no Supabase real por padrão.
 export const USE_LOCAL_DB =
   import.meta.env.VITE_USE_LOCAL_DB === 'true' ||
-  (import.meta.env.PROD && !import.meta.env.VITE_API_BASE_URL)
+  (import.meta.env.PROD && !import.meta.env.VITE_SUPABASE_URL)
 
 async function request<T>(
   path: string,
@@ -51,37 +52,19 @@ function motoboyToken() {
 }
 
 const remoteApi = {
-  categories: {
-    list: () => request<Category[]>('/api/categories'),
-  },
-  products: {
-    list: (categoryId?: string) =>
-      request<Product[]>(`/api/products${categoryId ? `?category_id=${categoryId}` : ''}`),
-    get: (id: string) => request<Product>(`/api/products/${id}`),
-  },
-  neighborhoods: {
-    list: () => request<string[]>('/api/neighborhoods'),
-  },
-  shippingRates: {
-    list: () => request<ShippingRate[]>('/api/shipping-rates'),
-  },
+  // Catálogo, checkout e consulta de pedido falam direto com o Supabase
+  // (RLS + RPCs) — ver frontend/src/lib/supabasePublicApi.ts e
+  // supabase/sunset_public_rls_and_rpc.sql. Não dependem do Railway.
+  categories: supabasePublicApi.categories,
+  products: supabasePublicApi.products,
+  neighborhoods: supabasePublicApi.neighborhoods,
+  shippingRates: supabasePublicApi.shippingRates,
   orders: {
-    create: (payload: {
-      customer_name: string
-      customer_whatsapp: string
-      delivery_type: 'entrega' | 'retirada'
-      neighborhood?: string
-      address?: string
-      payment_method: 'pix' | 'cartao' | 'dinheiro'
-      items: { product_id: string; quantity: number }[]
-    }) =>
-      request<Order>('/api/orders', {
-        method: 'POST',
-        body: JSON.stringify(payload),
-      }),
-    get: (id: string) => request<Order>(`/api/orders/${id}`),
-    track: (whatsapp: string) =>
-      request<Order[]>(`/api/orders/track?whatsapp=${encodeURIComponent(whatsapp)}`),
+    create: supabasePublicApi.orders.create,
+    get: supabasePublicApi.orders.get,
+    track: supabasePublicApi.orders.track,
+    // Pix ainda depende do backend Rust (precisa do token secreto do
+    // Mercado Pago) até virar uma Supabase Edge Function.
     refreshPayment: (id: string) =>
       request<Order>(`/api/orders/${id}/refresh-payment`, { method: 'POST' }),
     simulatePixPaid: (id: string) =>
