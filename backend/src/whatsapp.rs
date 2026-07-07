@@ -93,6 +93,7 @@ pub async fn connection_status(state: &AppState) -> Result<serde_json::Value, cr
     let resp = state
         .http
         .get(&url)
+        .timeout(Duration::from_secs(15))
         .header("apikey", state.evolution_api_key.as_str())
         .send()
         .await
@@ -106,9 +107,10 @@ pub async fn connect(state: &AppState) -> Result<serde_json::Value, crate::error
     require_configured(state)?;
     let base = state.evolution_api_url.trim_end_matches('/');
 
-    let _ = state
+    let create_result = state
         .http
         .post(format!("{base}/instance/create"))
+        .timeout(Duration::from_secs(15))
         .header("apikey", state.evolution_api_key.as_str())
         .json(&json!({
             "instanceName": *state.evolution_instance,
@@ -117,10 +119,14 @@ pub async fn connect(state: &AppState) -> Result<serde_json::Value, crate::error
         }))
         .send()
         .await;
+    if let Err(e) = &create_result {
+        tracing::warn!("evolution api instance/create failed (may already exist): {e}");
+    }
 
     let resp = state
         .http
         .get(format!("{base}/instance/connect/{}", state.evolution_instance))
+        .timeout(Duration::from_secs(15))
         .header("apikey", state.evolution_api_key.as_str())
         .send()
         .await
@@ -140,6 +146,7 @@ pub async fn logout(state: &AppState) -> Result<(), crate::error::AppError> {
     let resp = state
         .http
         .delete(&url)
+        .timeout(Duration::from_secs(15))
         .header("apikey", state.evolution_api_key.as_str())
         .send()
         .await
