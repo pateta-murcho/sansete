@@ -67,7 +67,7 @@ CREATE OR REPLACE FUNCTION sunset.admin_login(p_email text, p_password text)
 RETURNS jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = sunset, public
+SET search_path = sunset, public, extensions
 AS $$
 DECLARE
   v_admin sunset.admins%ROWTYPE;
@@ -91,7 +91,7 @@ CREATE OR REPLACE FUNCTION sunset.motoboy_login(p_email text, p_password text)
 RETURNS jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = sunset, public
+SET search_path = sunset, public, extensions
 AS $$
 DECLARE
   v_m sunset.motoboys%ROWTYPE;
@@ -115,7 +115,7 @@ CREATE OR REPLACE FUNCTION sunset.logout(p_token text)
 RETURNS void
 LANGUAGE sql
 SECURITY DEFINER
-SET search_path = sunset, public
+SET search_path = sunset, public, extensions
 AS $$
   DELETE FROM sunset.sessions WHERE token = p_token;
 $$;
@@ -131,7 +131,7 @@ CREATE OR REPLACE FUNCTION sunset._require_admin(p_token text)
 RETURNS text
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = sunset, public
+SET search_path = sunset, public, extensions
 AS $$
 DECLARE
   v_subject text;
@@ -149,7 +149,7 @@ CREATE OR REPLACE FUNCTION sunset._require_motoboy(p_token text)
 RETURNS text
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = sunset, public
+SET search_path = sunset, public, extensions
 AS $$
 DECLARE
   v_subject text;
@@ -178,7 +178,7 @@ CREATE OR REPLACE FUNCTION sunset.admin_update_profile(
 RETURNS jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = sunset, public
+SET search_path = sunset, public, extensions
 AS $$
 DECLARE
   v_admin_id text := sunset._require_admin(p_token);
