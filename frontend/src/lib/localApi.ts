@@ -8,6 +8,7 @@ import QRCode from 'qrcode'
 import { ApiError } from './apiError'
 import {
   ADMIN_CREDENTIALS,
+  FAKE_MOTOBOY_ID,
   loadDb,
   saveDb,
   nowIso,
