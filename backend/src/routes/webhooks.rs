@@ -67,17 +67,18 @@ async fn handle(state: &AppState, payload: &Value) -> anyhow::Result<()> {
     if phone_digits.is_empty() {
         return Ok(());
     }
+    let variants = phone_variants(&phone_digits);
 
     // No way to tell which specific order a raw WhatsApp message is "for"
     // when the same customer has more than one order awaiting a location at
     // once — so this updates all of them rather than guessing by recency.
     let result = sqlx::query(
         "UPDATE orders SET customer_lat = $1, customer_lng = $2 \
-         WHERE customer_whatsapp = $3 AND status = 'aguardando_localizacao'",
+         WHERE customer_whatsapp = ANY($3) AND status = 'aguardando_localizacao'",
     )
     .bind(lat)
     .bind(lng)
-    .bind(&phone_digits)
+    .bind(&variants)
     .execute(&state.pool)
     .await?;
 
@@ -91,4 +92,22 @@ async fn handle(state: &AppState, payload: &Value) -> anyhow::Result<()> {
     }
 
     Ok(())
+}
+
+/// Brazilian mobile numbers are `55` + 2-digit DDD + either 9 digits
+/// (`9XXXXXXXX`, current format) or 8 (`XXXXXXXX`, what WhatsApp sometimes
+/// sends instead) — so a number stored one way often arrives the other way.
+/// Returns both forms so the DB match tries either.
+fn phone_variants(digits: &str) -> Vec<String> {
+    let mut variants = vec![digits.to_string()];
+    if digits.len() == 13 && digits.starts_with("55") {
+        let (prefix, rest) = digits.split_at(4);
+        if let Some(without_nine) = rest.strip_prefix('9') {
+            variants.push(format!("{prefix}{without_nine}"));
+        }
+    } else if digits.len() == 12 && digits.starts_with("55") {
+        let (prefix, rest) = digits.split_at(4);
+        variants.push(format!("{prefix}9{rest}"));
+    }
+    variants
 }
