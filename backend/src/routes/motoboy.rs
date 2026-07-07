@@ -1,8 +1,9 @@
 use axum::extract::{Path, Query, State};
+use axum::http::StatusCode;
 use axum::Json;
 use serde::Deserialize;
 
-use crate::auth::MotoboyUser;
+use crate::auth::{MotoboyUser, SunsetMotoboySession};
 use crate::error::AppError;
 use crate::models::{
     OrderDto, OrderRow, RequestLocationInput, RequestLocationResult, SkippedOrder,
@@ -181,4 +182,40 @@ pub async fn update_order_status(
         .await?
         .ok_or_else(|| AppError::NotFound("order not found".to_string()))?;
     Ok(Json(dto))
+}
+
+// ---------- WhatsApp (Evolution API) — own instance per motoboy ----------
+//
+// Each motoboy gets their own Evolution API instance ("motoboy-<id>"),
+// separate from the store's own ("sunset"), so location-request messages go
+// out from the motoboy's own number. Auth via SunsetMotoboySession (checks
+// sunset.sessions directly), same reasoning as SunsetAdminSession.
+
+fn motoboy_instance_name(motoboy_id: &str) -> String {
+    format!("motoboy-{motoboy_id}")
+}
+
+pub async fn whatsapp_status(
+    State(state): State<AppState>,
+    SunsetMotoboySession(motoboy_id): SunsetMotoboySession,
+) -> Result<Json<serde_json::Value>, AppError> {
+    let instance = motoboy_instance_name(&motoboy_id);
+    Ok(Json(whatsapp::connection_status(&state, &instance).await?))
+}
+
+pub async fn whatsapp_connect(
+    State(state): State<AppState>,
+    SunsetMotoboySession(motoboy_id): SunsetMotoboySession,
+) -> Result<Json<serde_json::Value>, AppError> {
+    let instance = motoboy_instance_name(&motoboy_id);
+    Ok(Json(whatsapp::connect(&state, &instance).await?))
+}
+
+pub async fn whatsapp_logout(
+    State(state): State<AppState>,
+    SunsetMotoboySession(motoboy_id): SunsetMotoboySession,
+) -> Result<StatusCode, AppError> {
+    let instance = motoboy_instance_name(&motoboy_id);
+    whatsapp::logout(&state, &instance).await?;
+    Ok(StatusCode::NO_CONTENT)
 }

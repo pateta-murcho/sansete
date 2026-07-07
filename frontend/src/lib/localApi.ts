@@ -357,6 +357,8 @@ async function createMotoboy(payload: {
   phone: string
   email: string
   password: string
+  whatsapp?: string
+  commission_percent?: number
 }): Promise<Motoboy> {
   if (!payload.password) throw new ApiError(400, 'password is required to create a motoboy')
   const db = loadDb()
@@ -369,6 +371,8 @@ async function createMotoboy(payload: {
     phone: payload.phone,
     email: payload.email,
     password: payload.password,
+    whatsapp: payload.whatsapp ?? null,
+    commission_percent: payload.commission_percent ?? 0,
     active: true,
   }
   db.motoboys.push(motoboy)
@@ -387,6 +391,8 @@ async function updateMotoboy(
   if (payload.phone !== undefined) motoboy.phone = payload.phone
   if (payload.email !== undefined) motoboy.email = payload.email
   if (payload.active !== undefined) motoboy.active = payload.active
+  if (payload.whatsapp !== undefined) motoboy.whatsapp = payload.whatsapp
+  if (payload.commission_percent !== undefined) motoboy.commission_percent = payload.commission_percent
   if (payload.password) motoboy.password = payload.password
   saveDb(db)
   return stripPassword(motoboy)
@@ -476,7 +482,49 @@ async function financeiro(): Promise<FinanceiroSummary> {
 
   const recent_orders = [...db.orders].sort((a, b) => b.created_at.localeCompare(a.created_at)).slice(0, 20)
 
-  return { total_revenue, total_orders, orders_by_status, top_products, recent_orders }
+  const motoboys = db.motoboys.map((m) => {
+    const delivered = db.orders.filter(
+      (o) => o.motoboy_id === m.id && o.status === 'concluido' && o.delivery_type === 'entrega'
+    )
+    const total_shipping = delivered.reduce((sum, o) => sum + o.shipping_price, 0)
+    return {
+      id: m.id,
+      name: m.name,
+      commission_percent: m.commission_percent,
+      total_deliveries: delivered.length,
+      total_shipping,
+      total_earnings: Math.round(total_shipping * (m.commission_percent / 100) * 100) / 100,
+    }
+  })
+
+  return { total_revenue, total_orders, orders_by_status, top_products, recent_orders, motoboys }
+}
+
+async function motoboyFinanceiro(): Promise<import('./types').MotoboyFinanceiro> {
+  const db = loadDb()
+  const motoboy = db.motoboys.find((m) => m.id === FAKE_MOTOBOY_ID)
+  const commission_percent = motoboy?.commission_percent ?? 0
+  const delivered = db.orders.filter(
+    (o) => o.motoboy_id === FAKE_MOTOBOY_ID && o.status === 'concluido' && o.delivery_type === 'entrega'
+  )
+  const deliveries = delivered
+    .map((o) => ({
+      id: o.id,
+      customer_name: o.customer_name,
+      neighborhood: o.neighborhood,
+      shipping_price: o.shipping_price,
+      earned: Math.round(o.shipping_price * (commission_percent / 100) * 100) / 100,
+      updated_at: o.updated_at ?? o.created_at,
+    }))
+    .sort((a, b) => b.updated_at.localeCompare(a.updated_at))
+  const total_shipping = delivered.reduce((sum, o) => sum + o.shipping_price, 0)
+  return {
+    commission_percent,
+    total_deliveries: deliveries.length,
+    total_shipping,
+    total_earnings: Math.round(total_shipping * (commission_percent / 100) * 100) / 100,
+    deliveries,
+  }
 }
 
 // ---------- motoboy ----------
@@ -597,5 +645,13 @@ export const localApi = {
   },
   motoboy: {
     orders: { list: motoboyListOrders, requestLocation, updateStatus: motoboyUpdateStatus },
+    financeiro: { get: motoboyFinanceiro },
+    whatsapp: {
+      status: async () => ({ instance: { state: 'close' } }),
+      connect: async () => {
+        throw new ApiError(400, 'WhatsApp não disponível no modo demonstração.')
+      },
+      logout: async () => {},
+    },
   },
 }

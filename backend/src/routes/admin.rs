@@ -508,20 +508,20 @@ pub async fn whatsapp_status(
     State(state): State<AppState>,
     _admin: SunsetAdminSession,
 ) -> Result<Json<serde_json::Value>, AppError> {
-    Ok(Json(whatsapp::connection_status(&state).await?))
+    Ok(Json(whatsapp::connection_status(&state, &state.evolution_instance).await?))
 }
 
 pub async fn whatsapp_connect(
     State(state): State<AppState>,
     _admin: SunsetAdminSession,
 ) -> Result<Json<serde_json::Value>, AppError> {
-    Ok(Json(whatsapp::connect(&state).await?))
+    Ok(Json(whatsapp::connect(&state, &state.evolution_instance).await?))
 }
 
 pub async fn whatsapp_logout(
     State(state): State<AppState>,
     _admin: SunsetAdminSession,
 ) -> Result<StatusCode, AppError> {
-    whatsapp::logout(&state).await?;
+    whatsapp::logout(&state, &state.evolution_instance).await?;
     Ok(StatusCode::NO_CONTENT)
 }

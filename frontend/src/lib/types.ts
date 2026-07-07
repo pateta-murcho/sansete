@@ -63,7 +63,35 @@ export interface Motoboy {
   name: string
   phone: string
   email: string
+  whatsapp: string | null
+  commission_percent: number
   active: boolean
+}
+
+export interface MotoboyDelivery {
+  id: string
+  customer_name: string
+  neighborhood: string | null
+  shipping_price: number
+  earned: number
+  updated_at: string
+}
+
+export interface MotoboyFinanceiro {
+  commission_percent: number
+  total_deliveries: number
+  total_shipping: number
+  total_earnings: number
+  deliveries: MotoboyDelivery[]
+}
+
+export interface AdminMotoboyFinanceiro {
+  id: string
+  name: string
+  commission_percent: number
+  total_deliveries: number
+  total_shipping: number
+  total_earnings: number
 }
 
 export const STATUS_LABELS: Record<OrderStatus, string> = {
@@ -117,4 +145,5 @@ export interface FinanceiroSummary {
   orders_by_status: StatusCount[]
   top_products: TopProduct[]
   recent_orders: Order[]
+  motoboys: AdminMotoboyFinanceiro[]
 }

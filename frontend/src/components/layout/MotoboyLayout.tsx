@@ -1,7 +1,13 @@
-import { Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { LogOut } from 'lucide-react'
+import { Link, Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { LogOut, MessageCircle, Truck, Wallet } from 'lucide-react'
 import Logo from '../ui/Logo'
 import { useMotoboyAuth } from '../../store/motoboyAuth'
+
+const NAV_ITEMS = [
+  { href: '/motoboy', label: 'Fila', icon: Truck },
+  { href: '/motoboy/financeiro', label: 'Financeiro', icon: Wallet },
+  { href: '/motoboy/conta', label: 'Conta', icon: MessageCircle },
+]
 
 export default function MotoboyLayout() {
   const { token, name, logout } = useMotoboyAuth()
@@ -27,6 +33,23 @@ export default function MotoboyLayout() {
           Sair
         </button>
       </header>
+      <nav className="flex gap-2 overflow-x-auto px-4 sm:px-8 py-3 bg-son-black border-b border-white/5 scrollbar-hide sticky top-[65px] z-10">
+        {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
+          const active = location.pathname === href
+          return (
+            <Link
+              key={href}
+              to={href}
+              className={`flex-shrink-0 flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium transition-all ${
+                active ? 'sunset-bg text-white' : 'bg-son-surface border border-white/5 text-son-silver hover:bg-son-surface-light'
+              }`}
+            >
+              <Icon className="w-3.5 h-3.5" />
+              {label}
+            </Link>
+          )
+        })}
+      </nav>
       <main className="p-4 sm:p-8 max-w-4xl mx-auto">
         <Outlet />
       </main>

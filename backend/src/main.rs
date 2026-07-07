@@ -207,6 +207,9 @@ async fn main() -> anyhow::Result<()> {
             "/api/motoboy/orders/{id}/status",
             patch(routes::motoboy::update_order_status),
         )
+        .route("/api/motoboy/whatsapp/status", get(routes::motoboy::whatsapp_status))
+        .route("/api/motoboy/whatsapp/connect", get(routes::motoboy::whatsapp_connect))
+        .route("/api/motoboy/whatsapp/logout", post(routes::motoboy::whatsapp_logout))
         .layer(cors)
         .layer(TraceLayer::new_for_http())
         .with_state(state);

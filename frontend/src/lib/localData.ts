@@ -67,6 +67,8 @@ function seedDb(): LocalDb {
       phone: '83999990000',
       email: 'motoboy@sonset.com',
       password: 'motoboy123',
+      whatsapp: '83999990000',
+      commission_percent: 80,
       active: true,
     },
   ]

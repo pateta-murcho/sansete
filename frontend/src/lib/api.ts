@@ -10,6 +10,7 @@ import type {
   EvolutionStatus,
   FinanceiroSummary,
   Motoboy,
+  MotoboyFinanceiro,
   Order,
   Product,
   ShippingRate,
@@ -146,13 +147,15 @@ const remoteApi = {
     },
     motoboys: {
       list: () => rpc<Motoboy[]>('admin_list_motoboys', { p_token: adminToken() }),
-      create: (payload: { name: string; phone: string; email: string; password: string }) =>
+      create: (payload: { name: string; phone: string; email: string; password: string; whatsapp?: string; commission_percent?: number }) =>
         rpc<Motoboy>('admin_create_motoboy', {
           p_token: adminToken(),
           p_name: payload.name,
           p_phone: payload.phone,
           p_email: payload.email,
           p_password: payload.password,
+          p_whatsapp: payload.whatsapp || null,
+          p_commission_percent: payload.commission_percent ?? 0,
         }),
       update: (id: string, payload: Partial<Motoboy> & { password?: string }) =>
         rpc<Motoboy>('admin_update_motoboy', {
@@ -163,6 +166,8 @@ const remoteApi = {
           p_email: payload.email,
           p_password: payload.password || null,
           p_active: payload.active ?? true,
+          p_whatsapp: payload.whatsapp ?? null,
+          p_commission_percent: payload.commission_percent ?? null,
         }),
       delete: (id: string) => rpc<void>('admin_delete_motoboy', { p_token: adminToken(), p_id: id }),
     },
@@ -212,6 +217,16 @@ const remoteApi = {
           p_status: status,
           p_payment_confirmed: paymentConfirmed ?? null,
         }),
+    },
+    financeiro: {
+      get: () => rpc<MotoboyFinanceiro>('motoboy_financeiro', { p_token: motoboyToken() }),
+    },
+    // Igual admin.whatsapp, mas na instância própria do motoboy
+    // (backend Rust monta o nome "motoboy-<id>" sozinho).
+    whatsapp: {
+      status: () => request<EvolutionStatus>('/api/motoboy/whatsapp/status', { token: motoboyToken() }),
+      connect: () => request<EvolutionConnect>('/api/motoboy/whatsapp/connect', { token: motoboyToken() }),
+      logout: () => request<void>('/api/motoboy/whatsapp/logout', { method: 'POST', token: motoboyToken() }),
     },
   },
 }

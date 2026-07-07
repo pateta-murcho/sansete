@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Loader2, Package, TrendingUp, Wallet } from 'lucide-react'
+import { Loader2, Package, TrendingUp, Truck, Wallet } from 'lucide-react'
 import Card from '../../components/ui/Card'
 import { StatusBadge } from '../../components/ui/Badge'
 import { api } from '../../lib/api'
@@ -74,6 +74,29 @@ export default function AdminFinanceiro() {
                 <span className="flex-1 text-sm text-white truncate">{p.product_name}</span>
                 <span className="text-xs text-son-silver-dim">{p.quantity_sold}x</span>
                 <span className="sunset-text font-bold text-sm">{currency(p.revenue)}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Card>
+
+      <Card className="p-5 mb-6">
+        <div className="flex items-center gap-2 label mb-3">
+          <Truck className="w-3.5 h-3.5" /> Comissão dos motoboys
+        </div>
+        {data.motoboys.length === 0 ? (
+          <p className="text-sm text-son-silver-dim">Nenhum motoboy cadastrado.</p>
+        ) : (
+          <ul className="divide-y divide-white/5">
+            {data.motoboys.map((m) => (
+              <li key={m.id} className="py-2.5 flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-sm text-white truncate">{m.name}</p>
+                  <p className="text-xs text-son-silver-dim">
+                    {m.total_deliveries} entrega{m.total_deliveries === 1 ? '' : 's'} · {m.commission_percent}%
+                  </p>
+                </div>
+                <span className="sunset-text font-bold text-sm flex-shrink-0">{currency(m.total_earnings)}</span>
               </li>
             ))}
           </ul>

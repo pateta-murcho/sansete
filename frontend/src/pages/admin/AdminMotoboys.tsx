@@ -4,7 +4,7 @@ import Card from '../../components/ui/Card'
 import { api } from '../../lib/api'
 import type { Motoboy } from '../../lib/types'
 
-const EMPTY_FORM = { name: '', phone: '', email: '', password: '' }
+const EMPTY_FORM = { name: '', phone: '', email: '', password: '', whatsapp: '', commission_percent: '' }
 
 export default function AdminMotoboys() {
   const [motoboys, setMotoboys] = useState<Motoboy[]>([])
@@ -22,7 +22,10 @@ export default function AdminMotoboys() {
   const save = async () => {
     setSaving(true)
     try {
-      await api.admin.motoboys.create(form)
+      await api.admin.motoboys.create({
+        ...form,
+        commission_percent: form.commission_percent ? Number(form.commission_percent) : 0,
+      })
       setShowForm(false)
       setForm(EMPTY_FORM)
       load()
@@ -68,6 +71,8 @@ export default function AdminMotoboys() {
                 <p className="font-semibold text-white truncate">{m.name}</p>
                 <p className="text-xs text-son-silver-dim truncate">{m.email}</p>
                 <p className="text-xs text-son-silver-dim">{m.phone}</p>
+                {m.whatsapp && <p className="text-xs text-son-silver-dim">WhatsApp: {m.whatsapp}</p>}
+                <p className="text-xs sunset-text font-semibold">{m.commission_percent}% de comissão</p>
               </div>
               <div className="flex items-center gap-2 flex-shrink-0">
                 <button
@@ -108,6 +113,22 @@ export default function AdminMotoboys() {
               <div>
                 <label className="label">E-mail</label>
                 <input className="input-field" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+              </div>
+              <div>
+                <label className="label">WhatsApp (pra conectar a instância dele)</label>
+                <input className="input-field" value={form.whatsapp} onChange={(e) => setForm({ ...form, whatsapp: e.target.value })} />
+              </div>
+              <div>
+                <label className="label">Comissão (% do frete de cada entrega)</label>
+                <input
+                  className="input-field"
+                  type="number"
+                  min={0}
+                  max={100}
+                  step="1"
+                  value={form.commission_percent}
+                  onChange={(e) => setForm({ ...form, commission_percent: e.target.value })}
+                />
               </div>
               <div>
                 <label className="label">Senha</label>

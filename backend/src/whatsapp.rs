@@ -80,15 +80,17 @@ async fn evolution_json(
     Ok(body)
 }
 
-/// Current connection state of the configured instance
+/// Current connection state of the given instance
 /// (`{"instance": {"instanceName": "...", "state": "open"|"connecting"|"close"}}`,
 /// exact shape depends on the Evolution API version).
-pub async fn connection_status(state: &AppState) -> Result<serde_json::Value, crate::error::AppError> {
+pub async fn connection_status(
+    state: &AppState,
+    instance: &str,
+) -> Result<serde_json::Value, crate::error::AppError> {
     require_configured(state)?;
     let url = format!(
-        "{}/instance/connectionState/{}",
+        "{}/instance/connectionState/{instance}",
         state.evolution_api_url.trim_end_matches('/'),
-        state.evolution_instance
     );
     let resp = state
         .http
@@ -101,9 +103,9 @@ pub async fn connection_status(state: &AppState) -> Result<serde_json::Value, cr
     evolution_json(resp).await
 }
 
-/// Creates the instance if it doesn't exist yet (ignored if it already does)
-/// and returns a fresh QR code / pairing code to scan.
-pub async fn connect(state: &AppState) -> Result<serde_json::Value, crate::error::AppError> {
+/// Creates the given instance if it doesn't exist yet (ignored if it already
+/// does) and returns a fresh QR code / pairing code to scan.
+pub async fn connect(state: &AppState, instance: &str) -> Result<serde_json::Value, crate::error::AppError> {
     require_configured(state)?;
     let base = state.evolution_api_url.trim_end_matches('/');
 
@@ -113,7 +115,7 @@ pub async fn connect(state: &AppState) -> Result<serde_json::Value, crate::error
         .timeout(Duration::from_secs(15))
         .header("apikey", state.evolution_api_key.as_str())
         .json(&json!({
-            "instanceName": *state.evolution_instance,
+            "instanceName": instance,
             "qrcode": true,
             "integration": "WHATSAPP-BAILEYS"
         }))
@@ -125,7 +127,7 @@ pub async fn connect(state: &AppState) -> Result<serde_json::Value, crate::error
 
     let resp = state
         .http
-        .get(format!("{base}/instance/connect/{}", state.evolution_instance))
+        .get(format!("{base}/instance/connect/{instance}"))
         .timeout(Duration::from_secs(15))
         .header("apikey", state.evolution_api_key.as_str())
         .send()
@@ -134,14 +136,13 @@ pub async fn connect(state: &AppState) -> Result<serde_json::Value, crate::error
     evolution_json(resp).await
 }
 
-/// Logs out the WhatsApp session (keeps the instance registered so it can
-/// reconnect later with a new QR code).
-pub async fn logout(state: &AppState) -> Result<(), crate::error::AppError> {
+/// Logs out the WhatsApp session for the given instance (keeps it registered
+/// so it can reconnect later with a new QR code).
+pub async fn logout(state: &AppState, instance: &str) -> Result<(), crate::error::AppError> {
     require_configured(state)?;
     let url = format!(
-        "{}/instance/logout/{}",
+        "{}/instance/logout/{instance}",
         state.evolution_api_url.trim_end_matches('/'),
-        state.evolution_instance
     );
     let resp = state
         .http
