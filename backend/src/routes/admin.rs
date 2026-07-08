@@ -1,4 +1,4 @@
-use axum::extract::{Path, Query, State};
+use axum::extract::{Multipart, Path, Query, State};
 use axum::http::StatusCode;
 use axum::Json;
 use serde::Deserialize;
@@ -14,6 +14,7 @@ use crate::models::{
 use crate::orders_common::row_to_dto;
 use crate::state::AppState;
 use crate::status_flow;
+use crate::storage;
 use crate::whatsapp;
 
 // ---------- Categories ----------
@@ -176,6 +177,37 @@ pub async fn update_product(
         .fetch_one(&state.pool)
         .await?;
     Ok(Json(row.into()))
+}
+
+/// Multipart upload ("file" field) -> Supabase Storage, returns
+/// `{"url": "..."}` to save as the product's image_url. Only the image
+/// bytes ever leave the browser — the service_role key that authorizes the
+/// write stays server-side.
+pub async fn upload_product_image(
+    State(state): State<AppState>,
+    _admin: SunsetAdminSession,
+    mut multipart: Multipart,
+) -> Result<Json<serde_json::Value>, AppError> {
+    while let Some(field) = multipart
+        .next_field()
+        .await
+        .map_err(|e| AppError::BadRequest(format!("invalid upload: {e}")))?
+    {
+        if field.name() != Some("file") {
+            continue;
+        }
+        let content_type = field.content_type().unwrap_or("application/octet-stream").to_string();
+        let ext = storage::extension_for(&content_type);
+        let filename = format!("{}.{ext}", Uuid::new_v4());
+        let bytes = field
+            .bytes()
+            .await
+            .map_err(|e| AppError::BadRequest(format!("invalid upload: {e}")))?;
+
+        let url = storage::upload_image(&state, &filename, &content_type, bytes.to_vec()).await?;
+        return Ok(Json(serde_json::json!({ "url": url })));
+    }
+    Err(AppError::BadRequest("no file field in upload".to_string()))
 }
 
 pub async fn delete_product(
@@ -495,6 +527,38 @@ pub async fn financeiro(
         top_products,
         recent_orders,
     }))
+}
+
+#[derive(Debug, Deserialize)]
+pub struct NotifyOrderInput {
+    pub order_id: String,
+}
+
+/// Fired by the frontend right after moving an order to pedido_pronto.
+/// Message text is built here (not trusted from the client) and varies by
+/// delivery_type.
+pub async fn notify_order_ready(
+    State(state): State<AppState>,
+    _admin: SunsetAdminSession,
+    Json(input): Json<NotifyOrderInput>,
+) -> Result<StatusCode, AppError> {
+    let Some(order) = crate::orders_common::fetch_order_row(&state.pool, &input.order_id).await? else {
+        return Err(AppError::NotFound("order not found".to_string()));
+    };
+    let digits = whatsapp::digits_only(&order.customer_whatsapp);
+    let msg = if order.delivery_type == "retirada" {
+        format!(
+            "Olá, {}! Seu pedido está pronto para retirada 🎉 Te esperamos na loja!",
+            order.customer_name
+        )
+    } else {
+        format!(
+            "Olá, {}! Seu pedido está pronto 🎉 Em breve o motoboy vai te chamar aqui pedindo sua localização.",
+            order.customer_name
+        )
+    };
+    whatsapp::notify(&state, &state.evolution_instance, &digits, &msg);
+    Ok(StatusCode::NO_CONTENT)
 }
 
 // ---------- WhatsApp (Evolution API) ----------

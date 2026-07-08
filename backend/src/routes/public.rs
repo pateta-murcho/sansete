@@ -1,4 +1,5 @@
 use axum::extract::{Path, Query, State};
+use axum::http::StatusCode;
 use axum::Json;
 use serde::Deserialize;
 use uuid::Uuid;
@@ -270,6 +271,32 @@ pub async fn create_order(
         .await?
         .ok_or_else(|| AppError::Internal("order vanished after creation".to_string()))?;
     Ok(Json(dto))
+}
+
+#[derive(Debug, Deserialize)]
+pub struct NotifyOrderCreatedInput {
+    pub order_id: String,
+}
+
+/// Public on purpose — fires right after checkout, before the customer has
+/// any session/token. Message content is built server-side from the order
+/// row (never trusts client-supplied text), so the only thing this can be
+/// abused for is re-sending the same fixed message to an order's own
+/// customer, which is harmless.
+pub async fn notify_order_created(
+    State(state): State<AppState>,
+    Json(input): Json<NotifyOrderCreatedInput>,
+) -> Result<StatusCode, AppError> {
+    let Some(order) = fetch_order_row(&state.pool, &input.order_id).await? else {
+        return Err(AppError::NotFound("order not found".to_string()));
+    };
+    let digits = whatsapp::digits_only(&order.customer_whatsapp);
+    let msg = format!(
+        "Olá, {}! Recebemos seu pedido e já estamos preparando 😋 Assim que ficar pronto, avisamos por aqui!",
+        order.customer_name
+    );
+    whatsapp::notify(&state, &state.evolution_instance, &digits, &msg);
+    Ok(StatusCode::NO_CONTENT)
 }
 
 pub async fn get_order(

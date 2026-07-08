@@ -86,6 +86,12 @@ const remoteApi = {
       request<Order>(`/api/orders/${id}/refresh-payment`, { method: 'POST' }),
     simulatePixPaid: (id: string) =>
       request<Order>(`/api/orders/${id}/simulate-pix-paid`, { method: 'POST' }),
+    // Público — dispara logo após o checkout, avisando que o pedido chegou.
+    notifyCreated: (orderId: string) =>
+      request<void>('/api/orders/notify-created', {
+        method: 'POST',
+        body: JSON.stringify({ order_id: orderId }),
+      }),
   },
   // Login fala direto com o Supabase (RPC sunset.admin_login/motoboy_login —
   // ver supabase/sunset_admin_auth.sql), sem passar pelo Railway. O token
@@ -144,6 +150,22 @@ const remoteApi = {
           p_active: payload.active ?? true,
         }),
       delete: (id: string) => rpc<void>('admin_delete_product', { p_token: adminToken(), p_id: id }),
+      // Upload de imagem passa pelo Rust (não pelo Supabase RPC): precisa da
+      // service_role key pra escrever no Storage, que não pode ir pro navegador.
+      uploadImage: async (file: File) => {
+        const body = new FormData()
+        body.append('file', file)
+        const res = await fetch(`${API_BASE}/api/admin/products/upload-image`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${adminToken()}` },
+          body,
+        })
+        if (!res.ok) {
+          const msg = await res.json().catch(() => null)
+          throw new ApiError(res.status, msg?.error ?? `Erro ${res.status}`)
+        }
+        return (await res.json()) as { url: string }
+      },
     },
     motoboys: {
       list: () => rpc<Motoboy[]>('admin_list_motoboys', { p_token: adminToken() }),
@@ -179,6 +201,14 @@ const remoteApi = {
           p_order_id: id,
           p_status: status,
           p_payment_confirmed: paymentConfirmed ?? null,
+        }),
+      // Backend Rust monta o texto (varia por entrega/retirada) e manda pelo
+      // WhatsApp da loja.
+      notifyReady: (orderId: string) =>
+        request<void>('/api/admin/whatsapp/notify-order-ready', {
+          method: 'POST',
+          body: JSON.stringify({ order_id: orderId }),
+          token: adminToken(),
         }),
     },
     shippingRates: {
@@ -227,13 +257,20 @@ const remoteApi = {
       status: () => request<EvolutionStatus>('/api/motoboy/whatsapp/status', { token: motoboyToken() }),
       connect: () => request<EvolutionConnect>('/api/motoboy/whatsapp/connect', { token: motoboyToken() }),
       logout: () => request<void>('/api/motoboy/whatsapp/logout', { method: 'POST', token: motoboyToken() }),
-      // Chamado depois do RPC motoboy_request_location (que só mexe no
-      // banco) — manda a mensagem de verdade a partir do WhatsApp do
-      // próprio motoboy.
-      notifyLocationRequest: (orders: { phone: string; customer_name: string }[]) =>
+      // Chamados depois dos RPCs motoboy_request_location/motoboy_update_order_status
+      // (que só mexem no banco) — mandam a mensagem de verdade a partir do
+      // WhatsApp do próprio motoboy. O backend monta o texto (com o nome do
+      // motoboy) e busca os dados do pedido, só recebe os ids.
+      notifyLocationRequest: (orderIds: string[]) =>
         request<void>('/api/motoboy/whatsapp/notify-location-request', {
           method: 'POST',
-          body: JSON.stringify({ orders }),
+          body: JSON.stringify({ order_ids: orderIds }),
+          token: motoboyToken(),
+        }),
+      notifyEnRoute: (orderId: string) =>
+        request<void>('/api/motoboy/whatsapp/notify-en-route', {
+          method: 'POST',
+          body: JSON.stringify({ order_id: orderId }),
           token: motoboyToken(),
         }),
     },

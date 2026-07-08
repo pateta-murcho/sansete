@@ -221,33 +221,69 @@ pub async fn whatsapp_logout(
     Ok(StatusCode::NO_CONTENT)
 }
 
-// ---------- Location-request notification (sent from the motoboy's own
-// instance, after sunset.motoboy_request_location already updated the DB) ----------
+// ---------- Notifications sent from the motoboy's own instance ----------
+//
+// Message text is always built here from the order + motoboy rows (never
+// trusted from the client), the same way the store-side ones in
+// admin.rs/public.rs work.
 
-#[derive(Debug, Deserialize)]
-pub struct NotifyLocationOrder {
-    pub phone: String,
-    pub customer_name: String,
+async fn motoboy_name(pool: &sqlx::PgPool, motoboy_id: &str) -> Result<String, AppError> {
+    let row: Option<(String,)> = sqlx::query_as("SELECT name FROM motoboys WHERE id = $1")
+        .bind(motoboy_id)
+        .fetch_optional(pool)
+        .await?;
+    Ok(row.map(|(n,)| n).unwrap_or_else(|| "seu entregador".to_string()))
 }
 
 #[derive(Debug, Deserialize)]
 pub struct NotifyLocationRequestInput {
-    pub orders: Vec<NotifyLocationOrder>,
+    pub order_ids: Vec<String>,
 }
 
+/// Sent right after sunset.motoboy_request_location already updated the DB
+/// (that RPC only touches the database; this is the actual WhatsApp send).
 pub async fn notify_location_request(
     State(state): State<AppState>,
     SunsetMotoboySession(motoboy_id): SunsetMotoboySession,
     Json(input): Json<NotifyLocationRequestInput>,
 ) -> Result<StatusCode, AppError> {
     let instance = motoboy_instance_name(&motoboy_id);
-    for order in input.orders {
-        let digits = whatsapp::digits_only(&order.phone);
+    let name = motoboy_name(&state.pool, &motoboy_id).await?;
+    for order_id in input.order_ids {
+        let Some(order) = fetch_order_row(&state.pool, &order_id).await? else {
+            continue;
+        };
+        let digits = whatsapp::digits_only(&order.customer_whatsapp);
         let msg = format!(
-            "Olá {}! Para agilizar sua entrega, envie sua localização atual aqui no WhatsApp 📍",
+            "Olá, {}!\n\nSou {name}, entregador da Sunset Tabas 🛵\nPor gentileza, me envia sua localização fixa aqui no WhatsApp pra eu poder iniciar a corrida de entrega até você.",
             order.customer_name
         );
         whatsapp::notify(&state, &instance, &digits, &msg);
     }
+    Ok(StatusCode::NO_CONTENT)
+}
+
+#[derive(Debug, Deserialize)]
+pub struct NotifyEnRouteInput {
+    pub order_id: String,
+}
+
+/// Sent when the motoboy advances an order to em_rota_de_entrega.
+pub async fn notify_en_route(
+    State(state): State<AppState>,
+    SunsetMotoboySession(motoboy_id): SunsetMotoboySession,
+    Json(input): Json<NotifyEnRouteInput>,
+) -> Result<StatusCode, AppError> {
+    let instance = motoboy_instance_name(&motoboy_id);
+    let name = motoboy_name(&state.pool, &motoboy_id).await?;
+    let Some(order) = fetch_order_row(&state.pool, &input.order_id).await? else {
+        return Err(AppError::NotFound("order not found".to_string()));
+    };
+    let digits = whatsapp::digits_only(&order.customer_whatsapp);
+    let msg = format!(
+        "Olá, {}! Aqui é {name}, seu entregador da Sunset Tabas 🛵 Já estou a caminho, chego jajá!",
+        order.customer_name
+    );
+    whatsapp::notify(&state, &instance, &digits, &msg);
     Ok(StatusCode::NO_CONTENT)
 }

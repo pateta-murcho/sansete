@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Reorder } from 'framer-motion'
+import { Reorder, useDragControls } from 'framer-motion'
 import { GripVertical, Loader2, Package } from 'lucide-react'
 import { StatusBadge } from '../../components/ui/Badge'
 import Card from '../../components/ui/Card'
@@ -12,7 +12,6 @@ function currency(v: number) {
 }
 
 const FILTERS = [
-  { value: 'all', label: 'Todos' },
   { value: 'pendente', label: 'Pendentes' },
   { value: 'montando_pedido', label: 'Montando' },
   { value: 'pedido_pronto', label: 'Prontos' },
@@ -44,9 +43,70 @@ const NEXT_LABEL: Record<string, string> = {
   retiradas: 'Concluir retirada',
 }
 
+function OrderCard({
+  order,
+  busyId,
+  advance,
+}: {
+  order: Order
+  busyId: string | null
+  advance: (order: Order, requirePayment: boolean) => void
+}) {
+  const dragControls = useDragControls()
+  const next = nextStatusFor(order)
+  const canAdvance = !!next
+  const requiresPaymentConfirm =
+    order.status === 'retiradas' && order.payment_method !== 'pix' && order.payment_status !== 'pago'
+
+  return (
+    <Reorder.Item value={order} dragListener={false} dragControls={dragControls}>
+      <Card className="p-4">
+        <div className="flex items-center gap-2 mb-2">
+          <GripVertical
+            onPointerDown={(e) => dragControls.start(e)}
+            className="w-4 h-4 text-son-silver-dim flex-shrink-0 cursor-grab active:cursor-grabbing touch-none"
+          />
+          <span className="text-xs text-son-silver-dim flex-1">#{order.id.slice(0, 8)}</span>
+          <StatusBadge status={order.status} />
+        </div>
+        <p className="font-semibold text-white">{order.customer_name}</p>
+        <p className="mb-2">
+          <WhatsAppLink phone={order.customer_whatsapp} />
+        </p>
+        <ul className="text-sm text-son-silver space-y-0.5 mb-2">
+          {order.items.map((item) => (
+            <li key={item.product_id}>
+              {item.quantity}x {item.product_name}
+            </li>
+          ))}
+        </ul>
+        <div className="flex items-center justify-between text-sm mb-3">
+          <span className="text-son-silver-dim">
+            {order.delivery_type === 'retirada' ? 'Retirada' : `Entrega · ${order.neighborhood}`} · {order.payment_method}
+          </span>
+          <span className="sunset-text font-bold">{currency(order.total)}</span>
+        </div>
+        {canAdvance && (
+          <button
+            onClick={() => advance(order, requiresPaymentConfirm)}
+            disabled={busyId === order.id}
+            className="btn-secondary w-full text-sm py-2"
+          >
+            {busyId === order.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
+            {NEXT_LABEL[order.status]}
+          </button>
+        )}
+        {order.status === 'pedido_pronto' && order.delivery_type === 'entrega' && (
+          <p className="text-xs text-son-silver-dim text-center">Aguardando motoboy</p>
+        )}
+      </Card>
+    </Reorder.Item>
+  )
+}
+
 export default function AdminPedidos() {
   const [orders, setOrders] = useState<Order[]>([])
-  const [filter, setFilter] = useState<(typeof FILTERS)[number]['value']>('all')
+  const [filter, setFilter] = useState<(typeof FILTERS)[number]['value']>('pendente')
   const [loading, setLoading] = useState(true)
   const [confirmingOrder, setConfirmingOrder] = useState<Order | null>(null)
   const [busyId, setBusyId] = useState<string | null>(null)
@@ -63,8 +123,10 @@ export default function AdminPedidos() {
   useEffect(load, [])
 
   useEffect(() => {
-    setVisible(orders.filter((o) => filter === 'all' || o.status === filter))
+    setVisible(orders.filter((o) => o.status === filter))
   }, [orders, filter])
+
+  const counts = Object.fromEntries(FILTERS.map((f) => [f.value, orders.filter((o) => o.status === f.value).length]))
 
   const advance = async (order: Order, requirePayment: boolean) => {
     if (requirePayment) {
@@ -77,6 +139,9 @@ export default function AdminPedidos() {
     setBusyId(order.id)
     try {
       await api.admin.orders.updateStatus(order.id, next)
+      if (next === 'pedido_pronto') {
+        api.admin.orders.notifyReady(order.id).catch(() => {})
+      }
       load()
     } catch (e) {
       setError(e instanceof ApiError ? e.message : 'Não foi possível atualizar o pedido.')
@@ -117,7 +182,7 @@ export default function AdminPedidos() {
               filter === f.value ? 'sunset-bg text-white' : 'bg-son-surface-light border border-white/5 text-son-silver hover:border-son-pink/30'
             }`}
           >
-            {f.label}
+            {f.label} ({counts[f.value] ?? 0})
           </button>
         ))}
       </div>
@@ -133,55 +198,9 @@ export default function AdminPedidos() {
         </div>
       ) : (
         <Reorder.Group axis="y" values={visible} onReorder={setVisible} className="space-y-4">
-          {visible.map((order) => {
-            const next = nextStatusFor(order)
-            const canAdvance = !!next
-            const requiresPaymentConfirm =
-              order.status === 'retiradas' && order.payment_method !== 'pix' && order.payment_status !== 'pago'
-
-            return (
-              <Reorder.Item key={order.id} value={order}>
-                <Card className="p-4">
-                  <div className="flex items-center gap-2 mb-2">
-                    <GripVertical className="w-4 h-4 text-son-silver-dim flex-shrink-0 cursor-grab active:cursor-grabbing" />
-                    <span className="text-xs text-son-silver-dim flex-1">#{order.id.slice(0, 8)}</span>
-                    <StatusBadge status={order.status} />
-                  </div>
-                  <p className="font-semibold text-white">{order.customer_name}</p>
-                  <p className="mb-2">
-                    <WhatsAppLink phone={order.customer_whatsapp} />
-                  </p>
-                  <ul className="text-sm text-son-silver space-y-0.5 mb-2">
-                    {order.items.map((item) => (
-                      <li key={item.product_id}>
-                        {item.quantity}x {item.product_name}
-                      </li>
-                    ))}
-                  </ul>
-                  <div className="flex items-center justify-between text-sm mb-3">
-                    <span className="text-son-silver-dim">
-                      {order.delivery_type === 'retirada' ? 'Retirada' : `Entrega · ${order.neighborhood}`} ·{' '}
-                      {order.payment_method}
-                    </span>
-                    <span className="sunset-text font-bold">{currency(order.total)}</span>
-                  </div>
-                  {canAdvance && (
-                    <button
-                      onClick={() => advance(order, requiresPaymentConfirm)}
-                      disabled={busyId === order.id}
-                      className="btn-secondary w-full text-sm py-2"
-                    >
-                      {busyId === order.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
-                      {NEXT_LABEL[order.status]}
-                    </button>
-                  )}
-                  {order.status === 'pedido_pronto' && order.delivery_type === 'entrega' && (
-                    <p className="text-xs text-son-silver-dim text-center">Aguardando motoboy</p>
-                  )}
-                </Card>
-              </Reorder.Item>
-            )
-          })}
+          {visible.map((order) => (
+            <OrderCard key={order.id} order={order} busyId={busyId} advance={advance} />
+          ))}
         </Reorder.Group>
       )}
 

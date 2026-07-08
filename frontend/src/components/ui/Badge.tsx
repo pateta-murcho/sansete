@@ -13,7 +13,15 @@ const STATUS_COLORS: Record<OrderStatus, string> = {
   concluido: 'bg-emerald-500/20 text-emerald-400',
 }
 
-export function StatusBadge({ status, className }: { status: OrderStatus; className?: string }) {
+export function StatusBadge({
+  status,
+  className,
+  label,
+}: {
+  status: OrderStatus
+  className?: string
+  label?: string
+}) {
   return (
     <span
       className={clsx(
@@ -22,7 +30,7 @@ export function StatusBadge({ status, className }: { status: OrderStatus; classN
         className
       )}
     >
-      {STATUS_LABELS[status]}
+      {label ?? STATUS_LABELS[status]}
     </span>
   )
 }

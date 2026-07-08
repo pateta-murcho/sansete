@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react'
-import { Loader2, Package, Pencil, Plus, Trash2, X } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { ImagePlus, Loader2, Package, Pencil, Plus, Trash2, X } from 'lucide-react'
 import Card from '../../components/ui/Card'
-import { api } from '../../lib/api'
+import { api, ApiError } from '../../lib/api'
 import type { Category, Product } from '../../lib/types'
 
 function currency(v: number) {
@@ -19,6 +19,9 @@ export default function AdminProdutos() {
   const [form, setForm] = useState(EMPTY_FORM)
   const [newCategory, setNewCategory] = useState('')
   const [saving, setSaving] = useState(false)
+  const [uploading, setUploading] = useState(false)
+  const [uploadError, setUploadError] = useState<string | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const load = () => {
     setLoading(true)
@@ -74,6 +77,22 @@ export default function AdminProdutos() {
     if (!confirm('Remover este produto?')) return
     await api.admin.products.delete(id)
     load()
+  }
+
+  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+    setUploadError(null)
+    setUploading(true)
+    try {
+      const { url } = await api.admin.products.uploadImage(file)
+      setForm((f) => ({ ...f, image_url: url }))
+    } catch (err) {
+      setUploadError(err instanceof ApiError ? err.message : 'Erro ao enviar a imagem.')
+    } finally {
+      setUploading(false)
+    }
   }
 
   const addCategory = async () => {
@@ -208,8 +227,35 @@ export default function AdminProdutos() {
                 </select>
               </div>
               <div>
-                <label className="label">URL da imagem</label>
-                <input className="input-field" value={form.image_url} onChange={(e) => setForm({ ...form, image_url: e.target.value })} />
+                <label className="label">Imagem</label>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleImageChange}
+                />
+                <div className="flex items-center gap-3">
+                  <div className="w-20 h-20 rounded-xl bg-son-surface-light flex items-center justify-center overflow-hidden flex-shrink-0">
+                    {uploading ? (
+                      <Loader2 className="w-5 h-5 animate-spin text-son-silver-dim" />
+                    ) : form.image_url ? (
+                      <img src={form.image_url} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                      <Package className="w-6 h-6 text-son-silver-dim/40" />
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={uploading}
+                    className="btn-secondary text-sm py-2 px-3"
+                  >
+                    <ImagePlus className="w-3.5 h-3.5" />
+                    {form.image_url ? 'Trocar imagem' : 'Enviar imagem'}
+                  </button>
+                </div>
+                {uploadError && <p className="error-msg mt-1">{uploadError}</p>}
               </div>
               <button onClick={save} disabled={saving} className="btn-primary w-full mt-2">
                 {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : null}

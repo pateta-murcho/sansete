@@ -92,7 +92,7 @@ export default function Consultar() {
               <li key={order.id} className="bg-son-surface border border-white/5 rounded-2xl p-4">
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-xs text-son-silver-dim">Pedido #{order.id.slice(0, 8)}</span>
-                  <StatusBadge status={order.status} />
+                  <StatusBadge status={order.status} label={order.status === 'pendente' ? 'Pedido feito' : undefined} />
                 </div>
                 <ul className="text-sm text-son-silver space-y-0.5 mb-2">
                   {order.items.map((item) => (

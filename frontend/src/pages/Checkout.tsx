@@ -82,6 +82,7 @@ export default function Checkout() {
         items: lines.map((l) => ({ product_id: l.product.id, quantity: l.item.quantity })),
       })
       clear()
+      api.orders.notifyCreated(order.id).catch(() => {})
       if (paymentMethod === 'pix') {
         navigate(`/pagamento/${order.id}`)
       } else {

@@ -8,6 +8,7 @@ mod routes;
 mod seed;
 mod state;
 mod status_flow;
+mod storage;
 mod whatsapp;
 
 use std::str::FromStr;
@@ -81,6 +82,16 @@ async fn main() -> anyhow::Result<()> {
         );
     }
 
+    // Server-side only — used to upload product images to Supabase Storage
+    // (bypasses RLS). Never expose SUPABASE_SERVICE_ROLE_KEY to the frontend.
+    let supabase_url = std::env::var("SUPABASE_URL").unwrap_or_default();
+    let supabase_service_key = std::env::var("SUPABASE_SERVICE_ROLE_KEY").unwrap_or_default();
+    if supabase_url.is_empty() || supabase_service_key.is_empty() {
+        tracing::warn!(
+            "SUPABASE_URL/SUPABASE_SERVICE_ROLE_KEY not set — product image upload will be disabled"
+        );
+    }
+
     // This Supabase project is shared with other apps (e.g. VRTech), which use
     // the default "public" schema with similarly-named tables (products,
     // categories, orders...). To avoid colliding with those, everything this
@@ -123,6 +134,8 @@ async fn main() -> anyhow::Result<()> {
         mp_token: Arc::new(mp_token),
         pickup_address: Arc::new(pickup_address),
         backend_public_url: Arc::new(backend_public_url),
+        supabase_url: Arc::new(supabase_url),
+        supabase_service_key: Arc::new(supabase_service_key),
     };
 
     // CORS_ORIGINS: comma-separated list of allowed frontend origins. Defaults
@@ -163,6 +176,7 @@ async fn main() -> anyhow::Result<()> {
             "/api/orders/{id}/simulate-pix-paid",
             post(routes::public::simulate_pix_paid),
         )
+        .route("/api/orders/notify-created", post(routes::public::notify_order_created))
         // admin
         .route(
             "/api/admin/categories",
@@ -182,6 +196,7 @@ async fn main() -> anyhow::Result<()> {
                 .put(routes::admin::update_product)
                 .delete(routes::admin::delete_product),
         )
+        .route("/api/admin/products/upload-image", post(routes::admin::upload_product_image))
         .route(
             "/api/admin/motoboys",
             get(routes::admin::list_motoboys).post(routes::admin::create_motoboy),
@@ -201,6 +216,7 @@ async fn main() -> anyhow::Result<()> {
         .route("/api/admin/whatsapp/status", get(routes::admin::whatsapp_status))
         .route("/api/admin/whatsapp/connect", get(routes::admin::whatsapp_connect))
         .route("/api/admin/whatsapp/logout", post(routes::admin::whatsapp_logout))
+        .route("/api/admin/whatsapp/notify-order-ready", post(routes::admin::notify_order_ready))
         .route(
             "/api/admin/shipping-rates",
             get(routes::admin::list_shipping_rates),
@@ -225,6 +241,10 @@ async fn main() -> anyhow::Result<()> {
         .route(
             "/api/motoboy/whatsapp/notify-location-request",
             post(routes::motoboy::notify_location_request),
+        )
+        .route(
+            "/api/motoboy/whatsapp/notify-en-route",
+            post(routes::motoboy::notify_en_route),
         )
         // Público de propósito: é a Evolution API chamando, não um usuário
         // logado. Fica fora do CORS layer não importar (não é um browser).

@@ -15,4 +15,9 @@ pub struct AppState {
     /// the Evolution API webhook target so incoming WhatsApp messages
     /// (location shares) reach `/api/webhooks/evolution`.
     pub backend_public_url: Arc<String>,
+    /// Supabase project URL + service_role key, used server-side only to
+    /// upload product images to Supabase Storage (bypasses RLS — never
+    /// send this key to the browser).
+    pub supabase_url: Arc<String>,
+    pub supabase_service_key: Arc<String>,
 }

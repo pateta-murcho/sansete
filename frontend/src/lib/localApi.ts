@@ -340,6 +340,17 @@ async function updateProduct(id: string, payload: Partial<Product>): Promise<Pro
   return productDto(db, product)
 }
 
+// Sem backend real no modo demo: converte pra data URL direto no navegador,
+// funciona como preview mas não persiste em lugar nenhum de verdade.
+async function uploadProductImage(file: File): Promise<{ url: string }> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve({ url: reader.result as string })
+    reader.onerror = () => reject(new ApiError(400, 'Erro ao ler a imagem.'))
+    reader.readAsDataURL(file)
+  })
+}
+
 async function deleteProduct(id: string): Promise<void> {
   const db = loadDb()
   const idx = db.products.findIndex((p) => p.id === id)
@@ -622,18 +633,25 @@ export const localApi = {
     track: trackOrders,
     refreshPayment,
     simulatePixPaid,
+    notifyCreated: async () => {},
   },
   auth: { adminLogin, motoboyLogin, setAdminPassword },
   admin: {
     categories: { list: adminListCategories, create: createCategory, delete: deleteCategory },
-    products: { list: adminListProducts, create: createProduct, update: updateProduct, delete: deleteProduct },
+    products: {
+      list: adminListProducts,
+      create: createProduct,
+      update: updateProduct,
+      delete: deleteProduct,
+      uploadImage: uploadProductImage,
+    },
     motoboys: {
       list: adminListMotoboys,
       create: createMotoboy,
       update: updateMotoboy,
       delete: deleteMotoboy,
     },
-    orders: { list: adminListOrders, updateStatus: adminUpdateStatus },
+    orders: { list: adminListOrders, updateStatus: adminUpdateStatus, notifyReady: async () => {} },
     shippingRates: { list: adminListShippingRates, update: adminUpdateShippingRate },
     financeiro: { get: financeiro },
     whatsapp: {
@@ -654,6 +672,7 @@ export const localApi = {
       },
       logout: async () => {},
       notifyLocationRequest: async () => {},
+      notifyEnRoute: async () => {},
     },
   },
 }

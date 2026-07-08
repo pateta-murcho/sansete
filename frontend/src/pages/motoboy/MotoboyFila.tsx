@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Reorder } from 'framer-motion'
+import { Reorder, useDragControls } from 'framer-motion'
 import { GripVertical, Loader2, MapPin, MapPinned, Navigation, Package, PackageCheck } from 'lucide-react'
 import { StatusBadge } from '../../components/ui/Badge'
 import WhatsAppLink from '../../components/ui/WhatsAppLink'
@@ -26,6 +26,95 @@ const NEXT_LABEL: Partial<Record<OrderStatus, string>> = {
   aguardando_localizacao: 'Saiu para entrega',
   em_rota_de_entrega: 'Marcar entregue',
   entregue: 'Concluir',
+}
+
+function OrderCard({
+  order,
+  tab,
+  selected,
+  toggleSelect,
+  busyId,
+  advance,
+}: {
+  order: Order
+  tab: OrderStatus
+  selected: string[]
+  toggleSelect: (id: string) => void
+  busyId: string | null
+  advance: (order: Order, requirePayment: boolean) => void
+}) {
+  const dragControls = useDragControls()
+  const next = NEXT_STATUS[order.status]
+  // Gate the popup on whichever transition is actually pending payment
+  // confirmation: normally em_rota_de_entrega -> entregue, but also
+  // entregue -> concluido as a fallback for orders that somehow got
+  // to "entregue" without it (e.g. legacy data).
+  const requiresPaymentConfirm =
+    (order.status === 'em_rota_de_entrega' || order.status === 'entregue') &&
+    order.payment_method !== 'pix' &&
+    order.payment_status !== 'pago'
+
+  return (
+    <Reorder.Item
+      value={order}
+      dragListener={false}
+      dragControls={dragControls}
+      className="bg-son-surface border border-white/5 rounded-2xl p-4 flex items-start gap-3"
+    >
+      <GripVertical
+        onPointerDown={(e) => dragControls.start(e)}
+        className="w-4 h-4 text-son-silver-dim mt-1 flex-shrink-0 cursor-grab active:cursor-grabbing touch-none"
+      />
+      {(tab === 'pedido_pronto' || tab === 'aguardando_localizacao') && (
+        <input
+          type="checkbox"
+          checked={selected.includes(order.id)}
+          onChange={() => toggleSelect(order.id)}
+          className="w-4 h-4 mt-1 accent-son-pink flex-shrink-0"
+        />
+      )}
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center justify-between mb-1 gap-2">
+          <span className="font-semibold text-white truncate">{order.customer_name}</span>
+          {order.customer_lat != null && order.customer_lng != null ? (
+            <a
+              href={`https://www.google.com/maps?q=${order.customer_lat},${order.customer_lng}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold whitespace-nowrap bg-green-500/15 text-green-400 hover:bg-green-500/25 transition-colors flex-shrink-0"
+            >
+              <MapPinned className="w-3 h-3" />
+              Localização recebida
+            </a>
+          ) : (
+            <StatusBadge status={order.status} />
+          )}
+        </div>
+        <p className="text-xs text-son-silver-dim mb-1">
+          <WhatsAppLink phone={order.customer_whatsapp} />
+        </p>
+        <p className="text-sm text-son-silver-dim mt-1">
+          <MapPin className="w-3.5 h-3.5 inline mr-1 -mt-0.5" />
+          {order.neighborhood}
+        </p>
+        <div className="flex items-center justify-between text-sm mt-2">
+          <span className="text-son-silver-dim">{order.payment_method}</span>
+          <span className="sunset-text font-bold">{currency(order.total)}</span>
+        </div>
+        {next && (
+          <button
+            onClick={() => advance(order, requiresPaymentConfirm)}
+            disabled={busyId === order.id}
+            className="btn-secondary w-full text-sm py-2 mt-3"
+          >
+            {busyId === order.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Navigation className="w-3.5 h-3.5" />}
+            {NEXT_LABEL[order.status]}
+          </button>
+        )}
+      </div>
+    </Reorder.Item>
+  )
 }
 
 export default function MotoboyFila() {
@@ -72,11 +161,7 @@ export default function MotoboyFila() {
       // a mensagem de verdade, a partir do WhatsApp do próprio motoboy, é
       // essa segunda chamada (backend Rust, guarda a chave da Evolution API).
       if (result.updated.length > 0) {
-        await api.motoboy.whatsapp
-          .notifyLocationRequest(
-            result.updated.map((o) => ({ phone: o.customer_whatsapp, customer_name: o.customer_name }))
-          )
-          .catch(() => {})
+        api.motoboy.whatsapp.notifyLocationRequest(result.updated.map((o) => o.id)).catch(() => {})
       }
       load()
     } finally {
@@ -89,6 +174,9 @@ export default function MotoboyFila() {
     setRequesting(true)
     try {
       await Promise.all(selected.map((id) => api.motoboy.orders.updateStatus(id, 'em_rota_de_entrega')))
+      for (const id of selected) {
+        api.motoboy.whatsapp.notifyEnRoute(id).catch(() => {})
+      }
       load()
     } finally {
       setRequesting(false)
@@ -106,6 +194,9 @@ export default function MotoboyFila() {
     setBusyId(order.id)
     try {
       await api.motoboy.orders.updateStatus(order.id, next)
+      if (next === 'em_rota_de_entrega') {
+        api.motoboy.whatsapp.notifyEnRoute(order.id).catch(() => {})
+      }
       load()
     } catch (e) {
       setError(e instanceof ApiError ? e.message : 'Não foi possível atualizar o pedido.')
@@ -176,78 +267,17 @@ export default function MotoboyFila() {
         </div>
       ) : (
         <Reorder.Group axis="y" values={orders} onReorder={setOrders} className="space-y-3">
-          {orders.map((order) => {
-            const next = NEXT_STATUS[order.status]
-            // Gate the popup on whichever transition is actually pending payment
-            // confirmation: normally em_rota_de_entrega -> entregue, but also
-            // entregue -> concluido as a fallback for orders that somehow got
-            // to "entregue" without it (e.g. legacy data).
-            const requiresPaymentConfirm =
-              (order.status === 'em_rota_de_entrega' || order.status === 'entregue') &&
-              order.payment_method !== 'pix' &&
-              order.payment_status !== 'pago'
-            return (
-              <Reorder.Item
-                key={order.id}
-                value={order}
-                className="bg-son-surface border border-white/5 rounded-2xl p-4 flex items-start gap-3"
-              >
-                <GripVertical className="w-4 h-4 text-son-silver-dim mt-1 flex-shrink-0 cursor-grab active:cursor-grabbing" />
-                {(tab === 'pedido_pronto' || tab === 'aguardando_localizacao') && (
-                  <input
-                    type="checkbox"
-                    checked={selected.includes(order.id)}
-                    onChange={() => toggleSelect(order.id)}
-                    className="w-4 h-4 mt-1 accent-son-pink flex-shrink-0"
-                  />
-                )}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between mb-1 gap-2">
-                    <span className="font-semibold text-white truncate">{order.customer_name}</span>
-                    {order.customer_lat != null && order.customer_lng != null ? (
-                      <a
-                        href={`https://www.google.com/maps?q=${order.customer_lat},${order.customer_lng}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        onClick={(e) => e.stopPropagation()}
-                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold whitespace-nowrap bg-green-500/15 text-green-400 hover:bg-green-500/25 transition-colors flex-shrink-0"
-                      >
-                        <MapPinned className="w-3 h-3" />
-                        Localização recebida
-                      </a>
-                    ) : (
-                      <StatusBadge status={order.status} />
-                    )}
-                  </div>
-                  <p className="text-xs text-son-silver-dim mb-1">
-                    <WhatsAppLink phone={order.customer_whatsapp} />
-                  </p>
-                  <p className="text-sm text-son-silver-dim mt-1">
-                    <MapPin className="w-3.5 h-3.5 inline mr-1 -mt-0.5" />
-                    {order.neighborhood}
-                  </p>
-                  <div className="flex items-center justify-between text-sm mt-2">
-                    <span className="text-son-silver-dim">{order.payment_method}</span>
-                    <span className="sunset-text font-bold">{currency(order.total)}</span>
-                  </div>
-                  {next && (
-                    <button
-                      onClick={() => advance(order, requiresPaymentConfirm)}
-                      disabled={busyId === order.id}
-                      className="btn-secondary w-full text-sm py-2 mt-3"
-                    >
-                      {busyId === order.id ? (
-                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                      ) : (
-                        <Navigation className="w-3.5 h-3.5" />
-                      )}
-                      {NEXT_LABEL[order.status]}
-                    </button>
-                  )}
-                </div>
-              </Reorder.Item>
-            )
-          })}
+          {orders.map((order) => (
+            <OrderCard
+              key={order.id}
+              order={order}
+              tab={tab}
+              selected={selected}
+              toggleSelect={toggleSelect}
+              busyId={busyId}
+              advance={advance}
+            />
+          ))}
         </Reorder.Group>
       )}
 
