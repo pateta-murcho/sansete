@@ -24,6 +24,15 @@ use tower_http::trace::TraceLayer;
 
 use state::AppState;
 
+/// Reads an env var and trims whitespace/newlines — Railway (and copy-paste
+/// in general) makes it easy to end up with a trailing "\n" on a pasted
+/// secret, which silently breaks anything that puts the value in an HTTP
+/// header (reqwest fails with an opaque "builder error" and no indication
+/// it was a stray newline).
+fn env_trimmed(name: &str) -> String {
+    std::env::var(name).unwrap_or_default().trim().to_string()
+}
+
 fn random_secret() -> String {
     let mut rng = rand::thread_rng();
     (0..48)
@@ -49,9 +58,9 @@ async fn main() -> anyhow::Result<()> {
         }
     };
 
-    let evolution_api_url = std::env::var("EVOLUTION_API_URL").unwrap_or_default();
-    let evolution_api_key = std::env::var("EVOLUTION_API_KEY").unwrap_or_default();
-    let evolution_instance = std::env::var("EVOLUTION_INSTANCE").unwrap_or_default();
+    let evolution_api_url = env_trimmed("EVOLUTION_API_URL");
+    let evolution_api_key = env_trimmed("EVOLUTION_API_KEY");
+    let evolution_instance = env_trimmed("EVOLUTION_INSTANCE");
     if evolution_api_url.is_empty() || evolution_api_key.is_empty() || evolution_instance.is_empty() {
         tracing::warn!(
             "EVOLUTION_API_URL/EVOLUTION_API_KEY/EVOLUTION_INSTANCE not fully set — WhatsApp messages will only be logged, not sent"
@@ -75,7 +84,7 @@ async fn main() -> anyhow::Result<()> {
     // so incoming location messages reach /api/webhooks/evolution. Without it,
     // instances still connect/send fine — only the "receive customer location"
     // feature is disabled.
-    let backend_public_url = std::env::var("BACKEND_PUBLIC_URL").unwrap_or_default();
+    let backend_public_url = env_trimmed("BACKEND_PUBLIC_URL");
     if backend_public_url.is_empty() {
         tracing::warn!(
             "BACKEND_PUBLIC_URL not set — Evolution API webhooks won't be configured, so incoming WhatsApp location messages won't be captured"
@@ -84,8 +93,8 @@ async fn main() -> anyhow::Result<()> {
 
     // Server-side only — used to upload product images to Supabase Storage
     // (bypasses RLS). Never expose SUPABASE_SERVICE_ROLE_KEY to the frontend.
-    let supabase_url = std::env::var("SUPABASE_URL").unwrap_or_default();
-    let supabase_service_key = std::env::var("SUPABASE_SERVICE_ROLE_KEY").unwrap_or_default();
+    let supabase_url = env_trimmed("SUPABASE_URL");
+    let supabase_service_key = env_trimmed("SUPABASE_SERVICE_ROLE_KEY");
     if supabase_url.is_empty() || supabase_service_key.is_empty() {
         tracing::warn!(
             "SUPABASE_URL/SUPABASE_SERVICE_ROLE_KEY not set — product image upload will be disabled"
