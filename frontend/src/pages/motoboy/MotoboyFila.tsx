@@ -126,6 +126,11 @@ export default function MotoboyFila() {
   const [requesting, setRequesting] = useState(false)
   const [confirmingOrder, setConfirmingOrder] = useState<Order | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [counts, setCounts] = useState<Record<string, number>>({})
+
+  const loadCounts = () => {
+    api.motoboy.orders.counts().then(setCounts)
+  }
 
   const load = () => {
     setLoading(true)
@@ -134,6 +139,7 @@ export default function MotoboyFila() {
       .list(tab)
       .then(setOrders)
       .finally(() => setLoading(false))
+    loadCounts()
   }
 
   useEffect(load, [tab])
@@ -235,7 +241,7 @@ export default function MotoboyFila() {
               tab === t.value ? 'sunset-bg text-white' : 'bg-son-surface border border-white/5 text-son-silver hover:border-son-pink/30'
             }`}
           >
-            {t.label}
+            {t.label} ({counts[t.value] ?? 0})
           </button>
         ))}
       </div>

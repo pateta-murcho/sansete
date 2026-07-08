@@ -663,7 +663,27 @@ export const localApi = {
     },
   },
   motoboy: {
-    orders: { list: motoboyListOrders, requestLocation, updateStatus: motoboyUpdateStatus },
+    orders: {
+      list: motoboyListOrders,
+      requestLocation,
+      updateStatus: motoboyUpdateStatus,
+      counts: async () => {
+        const db = loadDb()
+        const forMotoboy = (status: string, unassigned = false) =>
+          db.orders.filter(
+            (o) =>
+              o.delivery_type === 'entrega' &&
+              (status === 'em_rota_de_entrega' ? ['em_rota_de_entrega', 'entregue'].includes(o.status) : o.status === status) &&
+              (unassigned ? o.motoboy_id == null : o.motoboy_id === FAKE_MOTOBOY_ID)
+          ).length
+        return {
+          pedido_pronto: forMotoboy('pedido_pronto', true),
+          aguardando_localizacao: forMotoboy('aguardando_localizacao'),
+          em_rota_de_entrega: forMotoboy('em_rota_de_entrega'),
+          concluido: forMotoboy('concluido'),
+        }
+      },
+    },
     financeiro: { get: motoboyFinanceiro },
     whatsapp: {
       status: async () => ({ instance: { state: 'close' } }),

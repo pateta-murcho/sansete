@@ -235,6 +235,7 @@ const remoteApi = {
   motoboy: {
     orders: {
       list: (status: string) => rpc<Order[]>('motoboy_list_orders', { p_token: motoboyToken(), p_status: status }),
+      counts: () => rpc<Record<string, number>>('motoboy_order_counts', { p_token: motoboyToken() }),
       requestLocation: (orderIds: string[]) =>
         rpc<{ updated: Order[]; skipped: { id: string; reason: string }[] }>('motoboy_request_location', {
           p_token: motoboyToken(),
