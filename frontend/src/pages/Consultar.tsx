@@ -1,16 +1,109 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
+import L from 'leaflet'
+import 'leaflet/dist/leaflet.css'
 import { Loader2, Package, Search } from 'lucide-react'
 import SiteHeader from '../components/layout/SiteHeader'
 import WhatsAppFab from '../components/WhatsAppFab'
 import CartFab from '../components/CartFab'
 import { StatusBadge } from '../components/ui/Badge'
 import { api } from '../lib/api'
-import type { Order } from '../lib/types'
+import { TILE_ATTR, TILE_URL, FALLBACK } from '../lib/geo/mapa'
+import type { DeliveryPosition, Order } from '../lib/types'
 import { useCustomer } from '../store/customer'
 
 function currency(v: number) {
   return `R$ ${v.toFixed(2).replace('.', ',')}`
+}
+
+const TRACK_POLL_MS = 5000
+
+function motoIcon(heading: number | null) {
+  return L.divIcon({
+    className: 'icone-limpo',
+    html: `<div style="font-size:24px;transform:rotate(${heading ?? 0}deg);transition:transform .3s">🛵</div>`,
+    iconSize: [28, 28],
+    iconAnchor: [14, 14],
+  })
+}
+
+function destIcon() {
+  return L.divIcon({
+    className: 'icone-limpo',
+    html: `<div style="font-size:26px">📍</div>`,
+    iconSize: [26, 26],
+    iconAnchor: [13, 26],
+  })
+}
+
+// Mapa ao vivo do motoboy a caminho — só aparece quando o pedido está
+// em_rota_de_entrega. Faz polling em vez de assinar Realtime (mais simples
+// e evita expor sunset.motoboy_runs via RLS pública; a cada poucos
+// segundos já dá a sensação de "ao vivo" sem esse risco).
+function DeliveryTrackingMap({ order }: { order: Order }) {
+  const [position, setPosition] = useState<DeliveryPosition | null>(null)
+  const mapDivRef = useRef<HTMLDivElement>(null)
+  const mapRef = useRef<L.Map | null>(null)
+  const motoMarkerRef = useRef<L.Marker | null>(null)
+  const destMarkerRef = useRef<L.Marker | null>(null)
+
+  useEffect(() => {
+    if (!mapDivRef.current || mapRef.current) return
+    const map = L.map(mapDivRef.current, { zoomControl: false }).setView([FALLBACK.lat, FALLBACK.lng], 14)
+    L.tileLayer(TILE_URL, { attribution: TILE_ATTR, maxZoom: 20 }).addTo(map)
+    if (order.customer_lat != null && order.customer_lng != null) {
+      destMarkerRef.current = L.marker([order.customer_lat, order.customer_lng], { icon: destIcon() }).addTo(map)
+    }
+    mapRef.current = map
+    return () => {
+      map.remove()
+      mapRef.current = null
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  useEffect(() => {
+    let cancelled = false
+    const poll = () => {
+      api
+        .trackDeliveryPosition(order.id)
+        .then((p) => {
+          if (!cancelled) setPosition(p)
+        })
+        .catch(() => {})
+    }
+    poll()
+    const interval = setInterval(poll, TRACK_POLL_MS)
+    return () => {
+      cancelled = true
+      clearInterval(interval)
+    }
+  }, [order.id])
+
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || !position) return
+    if (!motoMarkerRef.current) {
+      motoMarkerRef.current = L.marker([position.lat, position.lng], { icon: motoIcon(position.heading) }).addTo(map)
+    } else {
+      motoMarkerRef.current.setLatLng([position.lat, position.lng])
+      motoMarkerRef.current.setIcon(motoIcon(position.heading))
+    }
+    if (destMarkerRef.current) {
+      map.fitBounds(L.latLngBounds([[position.lat, position.lng], destMarkerRef.current.getLatLng()]), {
+        padding: [40, 40],
+      })
+    } else {
+      map.setView([position.lat, position.lng], 15)
+    }
+  }, [position])
+
+  return (
+    <div className="mt-3">
+      {!position && <p className="text-xs text-son-silver-dim mb-2">Aguardando a localização do motoboy…</p>}
+      <div ref={mapDivRef} className="w-full h-48 rounded-xl overflow-hidden border border-white/5" />
+    </div>
+  )
 }
 
 function formatPhone(value: string) {
@@ -107,6 +200,7 @@ export default function Consultar() {
                   </span>
                   <span className="sunset-text font-bold">{currency(order.total)}</span>
                 </div>
+                {order.status === 'em_rota_de_entrega' && <DeliveryTrackingMap order={order} />}
               </li>
             ))}
           </ul>
