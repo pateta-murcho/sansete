@@ -3,6 +3,15 @@ import { Loader2, Smartphone, Unplug } from 'lucide-react'
 import { ApiError } from '../../lib/apiError'
 import type { EvolutionConnect } from '../../lib/types'
 
+// O Baileys/Evolution API expira e troca o QR sozinho no servidor a cada
+// ~20-30s, independente de qualquer chamada do frontend. Sem repolling, a
+// imagem exibida fica "morta" depois desse tempo — é exatamente isso que
+// explica "funcionou escaneando do computador, não funcionou do celular":
+// só uma questão de quanto tempo demorou até escanear, não do aparelho em
+// si. Repollar garante um QR sempre vivo, em qualquer dispositivo.
+const POLL_STATUS_MS = 4000
+const REFRESH_QR_MS = 25000
+
 function extractState(status: unknown): string {
   const s = status as { instance?: { state?: string }; state?: string } | null
   return s?.instance?.state ?? s?.state ?? 'desconhecido'
@@ -34,15 +43,18 @@ export default function WhatsAppConnection({
   const [qr, setQr] = useState<EvolutionConnect | null>(null)
   const [error, setError] = useState<string | null>(null)
 
-  const loadStatus = async () => {
+  const loadStatus = async (): Promise<string | null> => {
     setLoadingStatus(true)
     setError(null)
     try {
       const data = await api.status()
-      setStatus(extractState(data))
+      const s = extractState(data)
+      setStatus(s)
+      return s
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Não foi possível consultar o status.')
       setStatus(null)
+      return null
     } finally {
       setLoadingStatus(false)
     }
@@ -52,6 +64,37 @@ export default function WhatsAppConnection({
     loadStatus()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  const connected = status === 'open'
+
+  // Enquanto o QR estiver na tela e a conexão ainda não fechou, mantém
+  // checando se o scan já aconteceu e troca o QR periodicamente antes que
+  // ele expire — sem isso, o QR fica visualmente "válido" mas morto.
+  useEffect(() => {
+    if (!qr || connected) return
+    let cancelled = false
+
+    const statusTimer = setInterval(async () => {
+      const s = await loadStatus()
+      if (!cancelled && s === 'open') setQr(null)
+    }, POLL_STATUS_MS)
+
+    const qrTimer = setInterval(async () => {
+      try {
+        const data = await api.connect()
+        if (!cancelled) setQr(data)
+      } catch {
+        // silencioso — tenta de novo no próximo tick
+      }
+    }, REFRESH_QR_MS)
+
+    return () => {
+      cancelled = true
+      clearInterval(statusTimer)
+      clearInterval(qrTimer)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [qr, connected])
 
   const connect = async () => {
     setConnecting(true)
@@ -82,7 +125,6 @@ export default function WhatsAppConnection({
     }
   }
 
-  const connected = status === 'open'
   const qrImage = qr ? extractQrImage(qr) : null
   const pairingCode = qr ? extractPairingCode(qr) : null
 
