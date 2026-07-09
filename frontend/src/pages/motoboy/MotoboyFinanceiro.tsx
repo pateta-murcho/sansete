@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Loader2, MapPin, Package, Wallet } from 'lucide-react'
+import { Clock, Loader2, MapPin, Package, Wallet } from 'lucide-react'
 import Card from '../../components/ui/Card'
 import { api } from '../../lib/api'
 import type { MotoboyFinanceiro as MotoboyFinanceiroData } from '../../lib/types'
@@ -30,7 +30,7 @@ export default function MotoboyFinanceiro() {
     <div>
       <h1 className="text-2xl font-black mb-6">Financeiro</h1>
 
-      <div className="grid grid-cols-2 gap-4 mb-6">
+      <div className="grid grid-cols-2 gap-4 mb-4">
         <Card className="p-5">
           <div className="flex items-center gap-2 text-son-silver-dim text-xs mb-2">
             <Wallet className="w-3.5 h-3.5" /> A receber
@@ -47,6 +47,15 @@ export default function MotoboyFinanceiro() {
       </div>
 
       <Card className="p-5 mb-6">
+        <div className="flex items-center gap-2 text-son-silver-dim text-xs mb-2">
+          <Clock className="w-3.5 h-3.5" /> Tempo médio por entrega
+        </div>
+        <p className="font-black text-xl text-white">
+          {data.avg_delivery_minutes > 0 ? `${data.avg_delivery_minutes.toFixed(1).replace('.', ',')} min` : '—'}
+        </p>
+      </Card>
+
+      <Card className="p-5 mb-6">
         <p className="label mb-3">Histórico de entregas</p>
         {data.deliveries.length === 0 ? (
           <p className="text-sm text-son-silver-dim">Nenhuma entrega concluída ainda.</p>
@@ -58,6 +67,7 @@ export default function MotoboyFinanceiro() {
                   <p className="text-sm text-white truncate">{d.customer_name}</p>
                   <p className="text-xs text-son-silver-dim flex items-center gap-1">
                     <MapPin className="w-3 h-3" /> {d.neighborhood ?? '-'}
+                    {d.duration_minutes != null && ` · ${d.duration_minutes.toFixed(0)} min`}
                   </p>
                 </div>
                 <div className="text-right flex-shrink-0">

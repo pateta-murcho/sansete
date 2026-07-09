@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Loader2, Package, TrendingUp, Truck, Wallet } from 'lucide-react'
+import { Clock, Loader2, Package, TrendingUp, Truck, Wallet } from 'lucide-react'
 import Card from '../../components/ui/Card'
 import { StatusBadge } from '../../components/ui/Badge'
 import { api } from '../../lib/api'
@@ -31,7 +31,7 @@ export default function AdminFinanceiro() {
     <div>
       <h1 className="text-2xl font-black mb-6">Financeiro</h1>
 
-      <div className="grid grid-cols-2 sm:grid-cols-2 gap-4 mb-6">
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-6">
         <Card className="p-5">
           <div className="flex items-center gap-2 text-son-silver-dim text-xs mb-2">
             <Wallet className="w-3.5 h-3.5" /> Receita paga
@@ -43,6 +43,14 @@ export default function AdminFinanceiro() {
             <Package className="w-3.5 h-3.5" /> Pedidos totais
           </div>
           <p className="font-black text-2xl text-white">{data.total_orders}</p>
+        </Card>
+        <Card className="p-5">
+          <div className="flex items-center gap-2 text-son-silver-dim text-xs mb-2">
+            <Clock className="w-3.5 h-3.5" /> Tempo médio de entrega
+          </div>
+          <p className="font-black text-2xl text-white">
+            {data.avg_delivery_minutes > 0 ? `${data.avg_delivery_minutes.toFixed(1).replace('.', ',')} min` : '—'}
+          </p>
         </Card>
       </div>
 
@@ -94,6 +102,7 @@ export default function AdminFinanceiro() {
                   <p className="text-sm text-white truncate">{m.name}</p>
                   <p className="text-xs text-son-silver-dim">
                     {m.total_deliveries} entrega{m.total_deliveries === 1 ? '' : 's'} · pago {currency(m.total_paid)}
+                    {m.avg_delivery_minutes > 0 && ` · ${m.avg_delivery_minutes.toFixed(0)} min/entrega`}
                   </p>
                 </div>
                 <span className={`font-bold text-sm flex-shrink-0 ${m.pending_amount > 0 ? 'sunset-text' : 'text-son-silver-dim'}`}>
