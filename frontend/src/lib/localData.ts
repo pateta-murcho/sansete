@@ -1,9 +1,13 @@
 import { distanciaKm } from './geo/rotas'
 import { FALLBACK as STORE_LOCATION } from './geo/mapa'
-import type { Category, Motoboy, Order, Product } from './types'
+import type { Category, Motoboy, MotoboySettlement, Order, Product } from './types'
 
 export interface LocalMotoboy extends Motoboy {
   password: string
+}
+
+export interface LocalSettlement extends MotoboySettlement {
+  motoboy_id: string
 }
 
 export interface LocalDb {
@@ -11,6 +15,7 @@ export interface LocalDb {
   products: Product[]
   motoboys: LocalMotoboy[]
   orders: Order[]
+  settlements: LocalSettlement[]
   pricePerKm: number
 }
 
@@ -62,12 +67,11 @@ function seedDb(): LocalDb {
       email: 'motoboy@sonset.com',
       password: 'motoboy123',
       whatsapp: '83999990000',
-      commission_percent: 80,
       active: true,
     },
   ]
 
-  return { categories, products, motoboys, orders: [], pricePerKm: 1.5 }
+  return { categories, products, motoboys, orders: [], settlements: [], pricePerKm: 1.5 }
 }
 
 export function loadDb(): LocalDb {

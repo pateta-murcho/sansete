@@ -33,10 +33,10 @@ export default function MotoboyFinanceiro() {
       <div className="grid grid-cols-2 gap-4 mb-6">
         <Card className="p-5">
           <div className="flex items-center gap-2 text-son-silver-dim text-xs mb-2">
-            <Wallet className="w-3.5 h-3.5" /> Meu ganho
+            <Wallet className="w-3.5 h-3.5" /> A receber
           </div>
-          <p className="sunset-text font-black text-2xl">{currency(data.total_earnings)}</p>
-          <p className="text-xs text-son-silver-dim mt-1">{data.commission_percent}% do frete de cada entrega</p>
+          <p className="sunset-text font-black text-2xl">{currency(data.pending_amount)}</p>
+          <p className="text-xs text-son-silver-dim mt-1">100% do frete de cada entrega</p>
         </Card>
         <Card className="p-5">
           <div className="flex items-center gap-2 text-son-silver-dim text-xs mb-2">
@@ -46,7 +46,7 @@ export default function MotoboyFinanceiro() {
         </Card>
       </div>
 
-      <Card className="p-5">
+      <Card className="p-5 mb-6">
         <p className="label mb-3">Histórico de entregas</p>
         {data.deliveries.length === 0 ? (
           <p className="text-sm text-son-silver-dim">Nenhuma entrega concluída ainda.</p>
@@ -61,9 +61,28 @@ export default function MotoboyFinanceiro() {
                   </p>
                 </div>
                 <div className="text-right flex-shrink-0">
-                  <p className="sunset-text font-bold text-sm">{currency(d.earned)}</p>
-                  <p className="text-xs text-son-silver-dim">frete {currency(d.shipping_price)}</p>
+                  <p className={`font-bold text-sm ${d.paid ? 'text-son-silver-dim' : 'sunset-text'}`}>{currency(d.earned)}</p>
+                  <p className="text-xs text-son-silver-dim">{d.paid ? 'pago' : 'pendente'}</p>
                 </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Card>
+
+      <Card className="p-5">
+        <p className="label mb-3">Pagamentos recebidos ({currency(data.total_paid)} no total)</p>
+        {data.settlements.length === 0 ? (
+          <p className="text-sm text-son-silver-dim">Nenhum pagamento registrado ainda.</p>
+        ) : (
+          <ul className="divide-y divide-white/5">
+            {data.settlements.map((s) => (
+              <li key={s.id} className="py-2.5 flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-sm text-white capitalize">{s.payment_method}</p>
+                  <p className="text-xs text-son-silver-dim">{new Date(s.paid_at).toLocaleString('pt-BR')}</p>
+                </div>
+                <span className="font-bold text-sm text-white flex-shrink-0">{currency(s.amount)}</span>
               </li>
             ))}
           </ul>

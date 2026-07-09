@@ -11,7 +11,10 @@ import type {
   FinanceiroSummary,
   Motoboy,
   MotoboyFinanceiro,
+  MotoboyPending,
+  MotoboySettlement,
   Order,
+  PaymentMethod,
   Product,
   ShippingSettings,
 } from './types'
@@ -169,7 +172,7 @@ const remoteApi = {
     },
     motoboys: {
       list: () => rpc<Motoboy[]>('admin_list_motoboys', { p_token: adminToken() }),
-      create: (payload: { name: string; phone: string; email: string; password: string; whatsapp?: string; commission_percent?: number }) =>
+      create: (payload: { name: string; phone: string; email: string; password: string; whatsapp?: string }) =>
         rpc<Motoboy>('admin_create_motoboy', {
           p_token: adminToken(),
           p_name: payload.name,
@@ -177,7 +180,6 @@ const remoteApi = {
           p_email: payload.email,
           p_password: payload.password,
           p_whatsapp: payload.whatsapp || null,
-          p_commission_percent: payload.commission_percent ?? 0,
         }),
       update: (id: string, payload: Partial<Motoboy> & { password?: string }) =>
         rpc<Motoboy>('admin_update_motoboy', {
@@ -189,9 +191,15 @@ const remoteApi = {
           p_password: payload.password || null,
           p_active: payload.active ?? true,
           p_whatsapp: payload.whatsapp ?? null,
-          p_commission_percent: payload.commission_percent ?? null,
         }),
       delete: (id: string) => rpc<void>('admin_delete_motoboy', { p_token: adminToken(), p_id: id }),
+      pending: (id: string) => rpc<MotoboyPending>('admin_motoboy_pending', { p_token: adminToken(), p_id: id }),
+      pay: (id: string, paymentMethod: PaymentMethod) =>
+        rpc<MotoboySettlement>('admin_pay_motoboy', {
+          p_token: adminToken(),
+          p_motoboy_id: id,
+          p_payment_method: paymentMethod,
+        }),
     },
     orders: {
       list: (status?: string) => rpc<Order[]>('admin_list_orders', { p_token: adminToken(), p_status: status ?? null }),

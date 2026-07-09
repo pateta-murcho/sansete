@@ -56,6 +56,7 @@ export interface Order {
   pix_copia_cola?: string | null
   customer_lat?: number | null
   customer_lng?: number | null
+  motoboy_paid_at?: string | null
   items: OrderItem[]
   created_at: string
   updated_at?: string
@@ -67,7 +68,6 @@ export interface Motoboy {
   phone: string
   email: string
   whatsapp: string | null
-  commission_percent: number
   active: boolean
 }
 
@@ -77,24 +77,38 @@ export interface MotoboyDelivery {
   neighborhood: string | null
   shipping_price: number
   earned: number
+  paid: boolean
   updated_at: string
 }
 
+export interface MotoboySettlement {
+  id: string
+  amount: number
+  payment_method: PaymentMethod
+  paid_at: string
+}
+
 export interface MotoboyFinanceiro {
-  commission_percent: number
+  pending_amount: number
+  total_paid: number
   total_deliveries: number
   total_shipping: number
-  total_earnings: number
   deliveries: MotoboyDelivery[]
+  settlements: MotoboySettlement[]
 }
 
 export interface AdminMotoboyFinanceiro {
   id: string
   name: string
-  commission_percent: number
   total_deliveries: number
   total_shipping: number
-  total_earnings: number
+  pending_amount: number
+  total_paid: number
+}
+
+export interface MotoboyPending {
+  pending_amount: number
+  pending_deliveries: number | null
 }
 
 export const STATUS_LABELS: Record<OrderStatus, string> = {

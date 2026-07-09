@@ -379,7 +379,6 @@ async function createMotoboy(payload: {
   email: string
   password: string
   whatsapp?: string
-  commission_percent?: number
 }): Promise<Motoboy> {
   if (!payload.password) throw new ApiError(400, 'password is required to create a motoboy')
   const db = loadDb()
@@ -393,7 +392,6 @@ async function createMotoboy(payload: {
     email: payload.email,
     password: payload.password,
     whatsapp: payload.whatsapp ?? null,
-    commission_percent: payload.commission_percent ?? 0,
     active: true,
   }
   db.motoboys.push(motoboy)
@@ -413,10 +411,40 @@ async function updateMotoboy(
   if (payload.email !== undefined) motoboy.email = payload.email
   if (payload.active !== undefined) motoboy.active = payload.active
   if (payload.whatsapp !== undefined) motoboy.whatsapp = payload.whatsapp
-  if (payload.commission_percent !== undefined) motoboy.commission_percent = payload.commission_percent
   if (payload.password) motoboy.password = payload.password
   saveDb(db)
   return stripPassword(motoboy)
+}
+
+// Entregas concluídas de um motoboy que ainda não foram repassadas
+// (motoboy_paid_at ainda não setado) — 100% do frete é dele, sem comissão.
+function pendingForMotoboy(db: LocalDb, motoboyId: string) {
+  const pending = db.orders.filter(
+    (o) => o.motoboy_id === motoboyId && o.status === 'concluido' && o.delivery_type === 'entrega' && !o.motoboy_paid_at
+  )
+  const amount = Math.round(pending.reduce((sum, o) => sum + o.shipping_price, 0) * 100) / 100
+  return { orderIds: pending.map((o) => o.id), amount }
+}
+
+async function motoboyPending(id: string): Promise<import('./types').MotoboyPending> {
+  const db = loadDb()
+  const { orderIds, amount } = pendingForMotoboy(db, id)
+  return { pending_amount: amount, pending_deliveries: orderIds.length || null }
+}
+
+async function payMotoboy(id: string, paymentMethod: PaymentMethod): Promise<import('./types').MotoboySettlement> {
+  const db = loadDb()
+  const { orderIds, amount } = pendingForMotoboy(db, id)
+  if (amount <= 0) throw new ApiError(400, 'motoboy has nothing pending to pay')
+  const paidAt = nowIso()
+  for (const orderId of orderIds) {
+    const order = db.orders.find((o) => o.id === orderId)
+    if (order) order.motoboy_paid_at = paidAt
+  }
+  const settlement = { id: uid(), motoboy_id: id, amount, payment_method: paymentMethod, paid_at: paidAt }
+  db.settlements.push(settlement)
+  saveDb(db)
+  return settlement
 }
 
 async function deleteMotoboy(id: string): Promise<void> {
@@ -507,13 +535,16 @@ async function financeiro(): Promise<FinanceiroSummary> {
       (o) => o.motoboy_id === m.id && o.status === 'concluido' && o.delivery_type === 'entrega'
     )
     const total_shipping = delivered.reduce((sum, o) => sum + o.shipping_price, 0)
+    const total_paid = db.settlements
+      .filter((s) => s.motoboy_id === m.id)
+      .reduce((sum, s) => sum + s.amount, 0)
     return {
       id: m.id,
       name: m.name,
-      commission_percent: m.commission_percent,
       total_deliveries: delivered.length,
       total_shipping,
-      total_earnings: Math.round(total_shipping * (m.commission_percent / 100) * 100) / 100,
+      pending_amount: pendingForMotoboy(db, m.id).amount,
+      total_paid: Math.round(total_paid * 100) / 100,
     }
   })
 
@@ -522,8 +553,6 @@ async function financeiro(): Promise<FinanceiroSummary> {
 
 async function motoboyFinanceiro(): Promise<import('./types').MotoboyFinanceiro> {
   const db = loadDb()
-  const motoboy = db.motoboys.find((m) => m.id === FAKE_MOTOBOY_ID)
-  const commission_percent = motoboy?.commission_percent ?? 0
   const delivered = db.orders.filter(
     (o) => o.motoboy_id === FAKE_MOTOBOY_ID && o.status === 'concluido' && o.delivery_type === 'entrega'
   )
@@ -533,17 +562,26 @@ async function motoboyFinanceiro(): Promise<import('./types').MotoboyFinanceiro>
       customer_name: o.customer_name,
       neighborhood: o.neighborhood,
       shipping_price: o.shipping_price,
-      earned: Math.round(o.shipping_price * (commission_percent / 100) * 100) / 100,
+      earned: o.shipping_price,
+      paid: !!o.motoboy_paid_at,
       updated_at: o.updated_at ?? o.created_at,
     }))
     .sort((a, b) => b.updated_at.localeCompare(a.updated_at))
   const total_shipping = delivered.reduce((sum, o) => sum + o.shipping_price, 0)
+  const total_paid = Math.round(
+    db.settlements.filter((s) => s.motoboy_id === FAKE_MOTOBOY_ID).reduce((sum, s) => sum + s.amount, 0) * 100
+  ) / 100
+  const settlements = db.settlements
+    .filter((s) => s.motoboy_id === FAKE_MOTOBOY_ID)
+    .map(({ id, amount, payment_method, paid_at }) => ({ id, amount, payment_method, paid_at }))
+    .sort((a, b) => b.paid_at.localeCompare(a.paid_at))
   return {
-    commission_percent,
+    pending_amount: pendingForMotoboy(db, FAKE_MOTOBOY_ID).amount,
+    total_paid,
     total_deliveries: deliveries.length,
     total_shipping,
-    total_earnings: Math.round(total_shipping * (commission_percent / 100) * 100) / 100,
     deliveries,
+    settlements,
   }
 }
 
@@ -658,6 +696,8 @@ export const localApi = {
       create: createMotoboy,
       update: updateMotoboy,
       delete: deleteMotoboy,
+      pending: motoboyPending,
+      pay: payMotoboy,
     },
     orders: { list: adminListOrders, updateStatus: adminUpdateStatus, notifyReady: async () => {} },
     shippingSettings: { get: getShippingSettings, update: updateShippingSettings },

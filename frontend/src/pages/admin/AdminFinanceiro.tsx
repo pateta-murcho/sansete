@@ -82,7 +82,7 @@ export default function AdminFinanceiro() {
 
       <Card className="p-5 mb-6">
         <div className="flex items-center gap-2 label mb-3">
-          <Truck className="w-3.5 h-3.5" /> Comissão dos motoboys
+          <Truck className="w-3.5 h-3.5" /> Frete dos motoboys (100% é deles)
         </div>
         {data.motoboys.length === 0 ? (
           <p className="text-sm text-son-silver-dim">Nenhum motoboy cadastrado.</p>
@@ -93,10 +93,12 @@ export default function AdminFinanceiro() {
                 <div className="min-w-0">
                   <p className="text-sm text-white truncate">{m.name}</p>
                   <p className="text-xs text-son-silver-dim">
-                    {m.total_deliveries} entrega{m.total_deliveries === 1 ? '' : 's'} · {m.commission_percent}%
+                    {m.total_deliveries} entrega{m.total_deliveries === 1 ? '' : 's'} · pago {currency(m.total_paid)}
                   </p>
                 </div>
-                <span className="sunset-text font-bold text-sm flex-shrink-0">{currency(m.total_earnings)}</span>
+                <span className={`font-bold text-sm flex-shrink-0 ${m.pending_amount > 0 ? 'sunset-text' : 'text-son-silver-dim'}`}>
+                  {m.pending_amount > 0 ? `a pagar: ${currency(m.pending_amount)}` : 'em dia'}
+                </span>
               </li>
             ))}
           </ul>
